@@ -5,6 +5,7 @@ import sys
 sys.path.insert(0, '../KUSignalLib/src')
 from KUSignalLib import DSP
 from KUSignalLib import MatLab
+from KUSignalLib import Communications
 
 
 A = 1  # incoming signal amplitude
@@ -42,6 +43,7 @@ x_kTs = DSP.Downsample(x_nT[sample_rate+1:], sample_rate)
 
 # 2.3 MAKE A DECISION FOR EACH PULSE
 detected_bits = [amplitude_to_bits[round(symbol)] for symbol in x_kTs]
+
 
 # # 2.4 PlOTTING SIMULATION RESULTS
 # plt.figure()
@@ -83,7 +85,7 @@ detected_bits = [amplitude_to_bits[round(symbol)] for symbol in x_kTs]
 # plt.show()
 
 
-# 3.3 TEST SYSTEM ON GIVEN ASCII DATA
+# 3 TEST SYSTEM ON GIVEN ASCII DATA
 test_file = "bb2data.mat" # binay input file with N messages
 input_message_length = 126 # bits (18 ASCII characters)
 r_nT = MatLab.loadMatLabFile(test_file)[1]
@@ -93,18 +95,12 @@ filter_denom = [1]
 padding_length = max(len(filter_num), len(filter_denom))
 x_nT = DSP.DirectForm2(filter_num, filter_denom, r_nT)
 
-x_kTs = DSP.Downsample(x_nT[sample_rate:], sample_rate) # may need +1 to sample rate index
+x_kTs = DSP.Downsample(x_nT[sample_rate:], sample_rate)
 
 detected_bits = [amplitude_to_bits[round(symbol)] for symbol in x_kTs]
 
-segmented_arrays = [detected_bits[i:i+7] for i in range(0, len(detected_bits), 7)]
+char_message = Communications.bin_to_ascii(detected_bits)
 
-bin_chars = []
-for segment in segmented_arrays:
-    binary_string = ''.join(str(bit) for bit in segment)
-    decimal_value = int(binary_string, 2)
-    ascii_char = chr(decimal_value)
-    bin_chars.append(ascii_char)
+print(char_message)
 
-print(''.join(bin_chars))
 

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.insert(0, '../KUSignalLib/src')
 from KUSignalLib import DSP
+from KUSignalLib import communications
 
 
 def complex_sinusoid(length, frequency, phase):
@@ -32,8 +33,6 @@ def dds(x, fc, K0=1):
     # fc = estimated carrier signal frequency
     # K0 = ?
     y = DDS
-
-
 
 
 
