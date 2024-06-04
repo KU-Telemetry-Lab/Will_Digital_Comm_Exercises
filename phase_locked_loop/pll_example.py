@@ -41,7 +41,7 @@ def main():
         ref.append(in_sig)
         out.append(pll.vco)
         diff.append(pll.phase_difference)
-    #plt.plot(ref)
+        
     plt.plot(ref)
     plt.plot(out)
     plt.plot(diff)
