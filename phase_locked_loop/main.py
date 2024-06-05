@@ -8,85 +8,77 @@ from KUSignalLib import DSP
 from KUSignalLib import communications
 
 
-def complex_sinusoid(length, frequency, phase):
-    t = np.arange(length)
-    omega = 2 * np.pi * frequency / length
-    complex_signal = np.exp(1j * (omega * t + phase))
-    return complex_signal
+class PLL:
+    def __init__(self, loop_bandwidth, carrier_estimate, sample_rate=1):
+        self.B = loop_bandwidth
+        self.fc = carrier_estimate
+        self.fs = sample_rate
 
+        self.zeta = 1/np.sqrt(2)
+        self.K0 = 1
+        self.Kp = 1
+        # self.K1 = ((4*self.zeta)/(self.zeta+(1/(4*self.zeta))))*((self.B*(1/self.fs))/self.K0)
+        # self.K2 = ((4)/(self.zeta+(1/(4*self.zeta)))**2)*(((self.B*(1/self.fs))**2)/self.K0)
+        self.K1 = 0.1247
+        self.K2 = 0.0083
 
-################## PLL SPECIFIC FUNCTIONS #######################
+        self.loop_filter_mem = 0.0
+        self.dds_internal_mem = 0.0
+        self.dds_output_mem = np.exp(1j*2*np.pi*self.fc/self.fs)
 
-def phaseDetector(sample1, sample2, Kp=1):
-    """
-    Phase detector implementation.
-    """
-    return np.angle(sample2 / sample1, deg=False) * Kp
+    def phase_detector(self, x):
+        return np.angle(x / self.dds_output_mem, deg=False) * self.Kp
 
-def loopFilter(x, Bn, Ts, zeta=1/np.sqrt(2), K0=1):
-    """
-    Loop filter implementation (PI controller).
-    """
-    K1 = ((4*zeta)/(zeta+(1/(4*zeta))))*((Bn*Ts)/K0)
-    K2 = ((4)/(zeta+(1/(4*zeta)))**2)*(((Bn*Ts)**2)/K0)
-    
-    filter_num = np.array([K1 + K2, -K1], dtype=np.float64)
-    filter_denom = np.array([1, -1], dtype=np.float64)
-    y = np.convolve(x, filter_num, mode='same')
-    return y
+    def loop_filter(self, x):
+        term1 = self.K1 * x
+        term2 = self.K2 * x + self.loop_filter_mem
+        self.loop_filter_mem = term2
+        return term1 + term2
 
-dds_prev = 0  # dds implementation dependent on previous calculated value
-
-def dds(x, fc, K0=1):
-    """
-    Direct Digital Synthesis (DDS) implementation.
-    """
-    global dds_prev
-    dds_prev += x + fc * 2 * np.pi
-    y = K0 * dds_prev
-    return np.cos(y) + 1j * np.sin(y)
-
-def complex_sinusoid(length, frequency, phase=0):
-    t = np.arange(length)
-    return np.exp(1j * (2 * np.pi * frequency * t + phase))
+    def dds(self, x):
+        temp = self.fc/self.fs + x + self.dds_internal_mem
+        self.dds_internal_mem = temp
+        self.dds_output_mem = np.exp(1j * 2 * np.pi * temp)
+        return self.dds_output_mem
 
 #################################################################
-# Simulation parameters
-length = 1000
-fc = 10
-phase = 0
-test_input = complex_sinusoid(length, fc, phase)
 
-# System parameters
-Ts = 1/fc
-Bn = 0.005
-fc_estimated = 11
+fc = 5
+delta_fc = +.005
+samples = 500
 
-# Recording parameters
+pll = PLL(5, carrier_estimate=fc, sample_rate=100)
+
 pll_input = []
-pll_output = [np.cos(fc_estimated) + 1j*np.sin(fc_estimated)]
+pll_output = []
+pll_error = []
 
-# Set up in streaming framework
-for i in range(len(test_input)):
-    e_nT = phaseDetector(test_input[i], pll_output[-1])
-    v_nT = loopFilter([e_nT], Bn, Ts)[-1]
-    dds_out = dds(v_nT, fc_estimated)
+for i in range(samples):
+    pll_in = np.exp(1j * 2 * np.pi * fc * i / pll.fs)
+    fc += delta_fc  # varying fc to make tracking visible
+    e_nT = pll.phase_detector(pll_in)
+    v_nT = pll.loop_filter(e_nT)
+    pll_out = pll.dds(v_nT)
 
-    pll_input.append(test_input[i])
-    pll_output.append(dds_out)
+    pll_input.append(pll_in)
+    pll_output.append(pll_out)
+    pll_error.append(e_nT)
 
-pll_input = np.array(pll_input)
-pll_output = np.array(pll_output)
+plt.figure(figsize=(12, 6))
+plt.subplot(3, 1, 1)
+plt.plot(np.real(pll_input), label="PLL Input")
+plt.title("PLL Input")
 
-###################### PLOTTING ################################
-# Plotting Complex Sinusoid
-plt.figure(figsize=(10, 5))
-plt.plot(np.real(test_input), label='Input Real part')
-plt.plot(np.real(pll_output[:-1]), label='Output Real part')
-plt.legend()
-plt.title('Input and Output of PLL')
-plt.xlabel('Time')
-plt.ylabel('Amplitude')
-plt.grid(True)
+plt.subplot(3, 1, 2)
+plt.plot(np.real(pll_output), label="PLL Output", color='orange')
+plt.title("PLL Output")
 
+plt.subplot(3, 1, 3)
+plt.plot(pll_error, label="Phase Error", color='green')
+plt.title("Phase Error")
+plt.tight_layout()
 plt.show()
+
+
+
+
