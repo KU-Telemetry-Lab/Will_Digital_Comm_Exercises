@@ -12,8 +12,6 @@ class PLL:
     def __init__(self, loop_bandwidth, carrier_estimate, sample_rate=1):
         """
         Initialize the Phase-Locked Loop (PLL) with the given parameters.
-        
-        Note: In general PLL is set such that B*fs is in the range [0.01, 0.1]
 
         :param loop_bandwidth: Loop bandwidth of the PLL.
         :param carrier_estimate: Initial estimate of the carrier frequency.
@@ -40,7 +38,7 @@ class PLL:
         :param x: Input signal.
         :return: Detected phase error scaled by the phase detector gain.
         """
-        return np.angle(x / self.dds_output_mem, deg=False) * self.Kp
+        return np.angle(x / self.dds_output_mem, deg=False) * self.K
 
     def loop_filter(self, x):
         """
@@ -66,6 +64,17 @@ class PLL:
         self.dds_output_mem = np.exp(1j * 2 * np.pi * temp)
         return self.dds_output_mem
 
+    def step(self, x):
+        """
+        Step through the PLL modules.
+
+        :param x: Input signal to PLL (complex sinusoid sample).
+        """
+        e_nT = self.phase_detector(x)
+        v_nT = self.loop_filter(e_nT)
+        pll_out = self.dds(v_nT)
+        return pll_out
+
 #################################################################
 
 fc = 100
@@ -84,13 +93,11 @@ for B in loop_bandwidths:
     for i in range(samples):
         pll_in = np.exp(1j * 2 * np.pi * fc * i / pll.fs)
         fc += delta_fc  # varying fc to make tracking visible
-        e_nT = pll.phase_detector(pll_in)
-        v_nT = pll.loop_filter(e_nT)
-        pll_out = pll.dds(v_nT)
+        pll_out = pll.step(pll_in)
 
         pll_input.append(pll_in)
         pll_output.append(pll_out)
-        pll_error.append(e_nT)
+        pll_output.append(np.angle(pll_out / pll_in, deg=False))
 
     plt.figure(figsize=(12, 6))
     plt.subplot(3, 1, 1)
