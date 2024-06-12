@@ -12,6 +12,8 @@ class PLL:
     def __init__(self, loop_bandwidth, carrier_estimate, sample_rate=1):
         """
         Initialize the Phase-Locked Loop (PLL) with the given parameters.
+        
+        Note: In general PLL is set such that B*fs is in the range [0.01, 0.1]
 
         :param loop_bandwidth: Loop bandwidth of the PLL.
         :param carrier_estimate: Initial estimate of the carrier frequency.
@@ -27,20 +29,29 @@ class PLL:
         self.K1 = ((4 * self.zeta) / (self.zeta + (1 / (4 * self.zeta)))) * ((self.B * (1 / self.fs)) / self.K0)  # Loop filter coefficient 1
         self.K2 = ((4) / (self.zeta + (1 / (4 * self.zeta))) ** 2) * (((self.B * (1 / self.fs)) ** 2) / self.K0)  # Loop filter coefficient 2
 
+        self.phase_error = 0.0
         self.loop_filter_mem = 0.0  # Loop filter memory
         self.dds_internal_mem = 0.0  # DDS internal memory
         self.dds_output_mem = np.exp(1j * 2 * np.pi * self.fc / self.fs)  # DDS output memory
 
-    def phase_detector(self, x):
+    def PhaseDetector(self, x):
         """
         Perform phase detection on the input signal.
 
         :param x: Input signal.
         :return: Detected phase error scaled by the phase detector gain.
         """
-        return np.angle(x / self.dds_output_mem, deg=False) * self.K
+        self.phase_error = np.angle(x / self.dds_output_mem, deg=False) * self.Kp
+        return self.phase_error
+        
 
-    def loop_filter(self, x):
+    def GetPhaseError(self):
+        """
+        Returns calculated phase error.
+        """
+        return self.phase_error
+
+    def LoopFilter(self, x):
         """
         Apply the loop filter to the detected phase error.
 
@@ -52,7 +63,7 @@ class PLL:
         self.loop_filter_mem = term2
         return term1 + term2
 
-    def dds(self, x):
+    def Dds(self, x):
         """
         Perform Direct Digital Synthesis (DDS) to generate the next output.
 
@@ -64,15 +75,15 @@ class PLL:
         self.dds_output_mem = np.exp(1j * 2 * np.pi * temp)
         return self.dds_output_mem
 
-    def step(self, x):
+    def Step(self, x):
         """
         Step through the PLL modules.
 
         :param x: Input signal to PLL (complex sinusoid sample).
         """
-        e_nT = self.phase_detector(x)
-        v_nT = self.loop_filter(e_nT)
-        pll_out = self.dds(v_nT)
+        e_nT = self.PhaseDetector(x)
+        v_nT = self.LoopFilter(e_nT)
+        pll_out = self.Dds(v_nT)
         return pll_out
 
 #################################################################
