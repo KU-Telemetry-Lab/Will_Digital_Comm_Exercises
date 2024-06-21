@@ -42,70 +42,69 @@ def freq_shift_modulation(input, f_c, f_s):
     output = input * complex_exponentials
     return output
 
-sample_rate = 8
-pulse_shape = "NRZ" # change to SRRC (50% excess bandwidth)
-symbol_clock_offset = 0
+# sample_rate = 8
+# symbol_clock_offset = 0
 
-bits = [3, 2, 0, 1]
-bits_str = ['11', '10', '00', '01']
-amplitudes = [complex( 1+ 1j), complex( 1+-1j), complex(-1+-1j), complex(-1+ 1j)]
-amplitude_to_bits = dict(zip(amplitudes, bits))
-bits_to_amplitude = dict(zip(bits, amplitudes))
-bits_to_bits_str = dict(zip(bits, bits_str))
-
-
-test_input_1 = [0, 0, 0, 2, 0, 0, 0]
-test_input_2 = [3, 2, 1, 0, 1, 2, 3]
-string_input = "will is cool"
-string_input_bin = ''.join(string_to_ascii_binary(string_input))
-input_bin_blocks = [string_input_bin[i:i+2] for i in range(0, len(string_input_bin), 2)]
-test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
+# bits = [3, 2, 0, 1]
+# bits_str = ['11', '10', '00', '01']
+# amplitudes = [complex( 1+ 1j), complex( 1+-1j), complex(-1+-1j), complex(-1+ 1j)]
+# amplitude_to_bits = dict(zip(amplitudes, bits))
+# bits_to_amplitude = dict(zip(bits, amplitudes))
+# bits_to_bits_str = dict(zip(bits, bits_str))
 
 
-# 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
-b_k = test_input_3
-a_k = [bits_to_amplitude[bit] for bit in b_k]
-a_k_upsampled = DSP.Upsample(a_k, sample_rate, interpolate=False)
+# test_input_1 = [0, 0, 0, 2, 0, 0, 0]
+# test_input_2 = [3, 2, 1, 0, 1, 2, 3]
+# string_input = "will is cool"
+# string_input_bin = ''.join(string_to_ascii_binary(string_input))
+# input_bin_blocks = [string_input_bin[i:i+2] for i in range(0, len(string_input_bin), 2)]
+# test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 
-# 1.2 PULSE SHAPE THE UPSAMPLED SIGNAL (SRRC)
-length = 64
-alpha = 0.5
-pulse_shape = communications.srrc2(.5, sample_rate, length)
-s_nT = np.array(
-    np.roll(np.real(convolve(np.real(a_k_upsampled), pulse_shape, mode="same")), -1) + 
-    1j * np.roll(np.real(convolve(np.imag(a_k_upsampled), pulse_shape, mode="same")), -1), 
-    dtype=complex
-)
 
-# # 1.3 MODULATE ONTO CARRIER USING LOCAL OSCILLATOR 
-# fc = 1
-# s_nT_modulated = np.array(np.sqrt(2) * freq_shift_modulation(np.real(s_nT), fc, sample_rate))
+# # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
+# b_k = test_input_3
+# a_k = [bits_to_amplitude[bit] for bit in b_k]
+# a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate=False)
 
-# # 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
-# r_nT = np.array(np.sqrt(2) * freq_shift_modulation(np.real(s_nT_modulated), fc, sample_rate))
+# # 1.2 PULSE SHAPE THE UPSAMPLED SIGNAL (SRRC)
+# length = 64
+# alpha = 0.5
+# pulse_shape = communications.srrc(.5, sample_rate, length)
+# s_nT = np.array(
+#     np.roll(np.real(convolve(np.real(a_k_upsampled), pulse_shape, mode="same")), -1) + 
+#     1j * np.roll(np.real(convolve(np.imag(a_k_upsampled), pulse_shape, mode="same")), -1), 
+#     dtype=complex
+# )
 
-# 2.2 MATCH FILTER THE RECEIVED SIGNAL
-x_nT = np.array(
-    np.roll(np.real(convolve(np.real(s_nT), pulse_shape, mode="same")), -1) + 
-    1j * np.roll(np.real(convolve(np.imag(s_nT), pulse_shape, mode="same")), -1), 
-    dtype=complex
-)
+# # # 1.3 MODULATE ONTO CARRIER USING LOCAL OSCILLATOR 
+# # fc = 1
+# # s_nT_modulated = np.array(np.sqrt(2) * freq_shift_modulation(np.real(s_nT), fc, sample_rate))
 
-# 2.3 DOWNSAMPLE EACH PULSE
-x_kTs = np.array(DSP.Downsample(x_nT, sample_rate))
+# # # 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
+# # r_nT = np.array(np.sqrt(2) * freq_shift_modulation(np.real(s_nT_modulated), fc, sample_rate))
 
-# 2.5 MAKE A DECISION FOR EACH PULSE
-qpsk = [[complex( 1+ 1j), 3], [complex( 1+-1j), 2], [complex(-1+-1j), 0], [complex(-1+ 1j), 1]]
-detected_ints = communications.nearest_neighbor(x_kTs, qpsk)
-print(f"Transmission Symbol Errors: {error_count(b_k, detected_ints)}")
+# # 2.2 MATCH FILTER THE RECEIVED SIGNAL
+# x_nT = np.array(
+#     np.roll(np.real(convolve(np.real(s_nT), pulse_shape, mode="same")), -1) + 
+#     1j * np.roll(np.real(convolve(np.imag(s_nT), pulse_shape, mode="same")), -1), 
+#     dtype=complex
+# )
 
-# 2.6 CONVERT BINARY TO ASCII
-detected_bits = []
-for symbol in detected_ints:
-    detected_bits += ([*bin(symbol)[2:].zfill(2)])
+# # 2.3 DOWNSAMPLE EACH PULSE
+# x_kTs = np.array(DSP.downsample(x_nT, sample_rate))
 
-message = communications.bin_to_char(detected_bits)
-print(message)
+# # 2.5 MAKE A DECISION FOR EACH PULSE
+qpsk_constellation = [[complex( 1+ 1j), 3], [complex( 1+-1j), 2], [complex(-1+-1j), 0], [complex(-1+ 1j), 1]]
+# detected_ints = communications.nearest_neighbor(x_kTs, qpsk_constellation)
+# print(f"Transmission Symbol Errors: {error_count(b_k, detected_ints)}")
+
+# # 2.6 CONVERT BINARY TO ASCII
+# detected_bits = []
+# for symbol in detected_ints:
+#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
+
+# message = communications.bin_to_char(detected_bits)
+# print(message)
 
 # # Plot original symbols
 # plt.figure()
@@ -139,3 +138,21 @@ print(message)
 # plt.show()
 
 
+# 3 TEST SYSTEM ON GIVEN ASCII DATA
+test_file = "qpskdata.mat"
+modulated_data = MatLab.load_matlab_file(test_file)[1]
+input_message_length = 0
+data_offset = 12
+carrier_frequency = 2
+sample_rate = 8
+pulse_shape = communications.srrc(.5, sample_rate, 32)
+
+r_nT = np.array(np.sqrt(2) * freq_shift_modulation(modulated_data, carrier_frequency, sample_rate), dtype=complex)
+x_nT = np.array(np.roll(np.convolve(r_nT, pulse_shape, mode="full"), -1), dtype=complex)
+x_kTs = DSP.downsample(x_nT, sample_rate, offset=sample_rate)
+detected_symbols = communications.nearest_neighbor(x_kTs, qpsk_constellation)
+detected_bits = []
+for symbol in detected_symbols:
+    detected_bits += ([*bin(symbol)[2:].zfill(2)])
+message = communications.bin_to_char(detected_bits[data_offset:])
+print(message)

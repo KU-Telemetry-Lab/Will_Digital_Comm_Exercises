@@ -135,9 +135,5 @@ x_kTs = DSP.Downsample(x_nT[sample_rate:], sample_rate)
 
 detected_ints = Communications.nearest_neighbor(x_kTs, mary_pam)
 
-detected_bits = []
-for symbol in detected_ints:
-    detected_bits += ([*bin(symbol)[2:].zfill(3)])
-
 char_message = Communications.bin_to_ascii(detected_bits)
 print(char_message)
