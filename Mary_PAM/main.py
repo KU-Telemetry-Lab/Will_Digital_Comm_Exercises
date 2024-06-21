@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, '../KUSignalLib/src')
 from KUSignalLib import DSP
 from KUSignalLib import MatLab
-from KUSignalLib import Communications
+from KUSignalLib import communications as Communications
 
 
 def int_to_three_bit_binary(num):
@@ -25,7 +25,6 @@ sample_rate = 16 # samples/bit
 pulse_shape = "NRZ" # non return to zero pulse shaping
 symbol_clock_offset = 0
 
-A = 1 # incoming signal base amplitude
 amplitudes = [-7, -5, -3, -1, 1, 3, 5, 7]
 bits = [0, 1, 3, 2, 5, 7, 6, 4]
 bin_strs = ['000', '001', '011', '010', '101', '111', '110', '100']
@@ -56,17 +55,14 @@ b_k = test_input_3
 a_k = [bits_to_amplitude[bit] for bit in b_k]
 a_k_upsampled = DSP.Upsample(a_k, sample_rate, interpolate=False)
 
-
-# 1.2 NRZ FILTER THE UPSDAMPLED SIGNAL
+# 1.2 NRZ FILTER THE UPSAMPLED SIGNAL (PULSE SHAPING)
 filter_num = [.25 for i in range(sample_rate)]
 filter_denom = [1]
 padding_length = max(len(filter_num), len(filter_num))
 s_nT = DSP.DirectForm2(filter_num, filter_denom, a_k_upsampled)
 
-
 # 2.1 MATCH FILTER THE RECIEVED SIGNAL
 x_nT = DSP.DirectForm2(filter_num, filter_denom, s_nT) 
-
 
 # 2.2 DOWNSAMPLE EACH PULSE
 x_kTs = DSP.Downsample(x_nT[sample_rate:], sample_rate)
@@ -83,13 +79,12 @@ for num in detected_ints:
         bin3 = ''.join(['0'] + list(bin3))
     detected_bits += bin3
 
-char_message = Communications.bin_to_ascii(detected_bits)
+char_message = Communications.bin_to_char(detected_bits)
 print(char_message)
-
 
 # 2.4 PlOTTING SIMULATION RESULTS
 plt.figure()
-plt.stem(a_k)test_input_3
+plt.stem(a_k)
 plt.xlabel('Index')
 plt.ylabel('Value')
 
