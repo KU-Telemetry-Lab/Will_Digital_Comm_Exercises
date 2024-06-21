@@ -36,13 +36,11 @@ def convolve(x, h, mode='full'):
         y = y[start:end]
     return y
 
-def freq_shift_modulation(input, f_c, f_s, phase_offset=0):
+def freq_shift_modulation(input, f_c, f_s):
     indices = np.arange(len(input))
-    complex_exponentials = np.exp(1j * (2 * np.pi * f_c * indices / f_s + phase_offset))
+    complex_exponentials = np.exp(-1j * (2 * np.pi * f_c * indices / f_s))
     output = input * complex_exponentials
     return output
-
-
 
 sample_rate = 8
 pulse_shape = "NRZ" # change to SRRC (50% excess bandwidth)
@@ -56,7 +54,7 @@ bits_to_amplitude = dict(zip(bits, amplitudes))
 bits_to_bits_str = dict(zip(bits, bits_str))
 
 
-test_input_1 = [0, 0, 0, 2, 0, 0, 2]
+test_input_1 = [0, 0, 0, 2, 0, 0, 0]
 test_input_2 = [3, 2, 1, 0, 1, 2, 3]
 string_input = "will is cool"
 string_input_bin = ''.join(string_to_ascii_binary(string_input))
@@ -65,7 +63,7 @@ test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 
 
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
-b_k = test_input_1
+b_k = test_input_3
 a_k = [bits_to_amplitude[bit] for bit in b_k]
 a_k_upsampled = DSP.Upsample(a_k, sample_rate, interpolate=False)
 
@@ -79,64 +77,65 @@ s_nT = np.array(
     dtype=complex
 )
 
-# 1.3 MODULATE ONTO CARRIER USING LOCAL OSCILLATOR 
-fc = 1
-s_nT_modulated = np.array(
-    (np.sqrt(2) * freq_shift_modulation(np.real(s_nT), fc, sample_rate, phase_offset=0)) - 
-    (np.sqrt(2) * freq_shift_modulation(np.imag(s_nT), fc, sample_rate, phase_offset=np.pi/2))
-)
+# # 1.3 MODULATE ONTO CARRIER USING LOCAL OSCILLATOR 
+# fc = 1
+# s_nT_modulated = np.array(np.sqrt(2) * freq_shift_modulation(np.real(s_nT), fc, sample_rate))
 
 # # 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
-r_nT = np.array(
-    (np.sqrt(2) * freq_shift_modulation(np.real(s_nT_modulated), fc, sample_rate, phase_offset=0)) - 
-    1j * (np.sqrt(2) * freq_shift_modulation(np.imag(s_nT_modulated), fc, sample_rate, phase_offset=np.pi/2))
-)
+# r_nT = np.array(np.sqrt(2) * freq_shift_modulation(np.real(s_nT_modulated), fc, sample_rate))
 
 # 2.2 MATCH FILTER THE RECEIVED SIGNAL
 x_nT = np.array(
-    np.roll(np.real(convolve(np.real(s_nT_modulated), pulse_shape, mode="same")), -1) + 
-    1j * np.roll(np.real(convolve(np.imag(r_nT), pulse_shape, mode="same")), -1), 
+    np.roll(np.real(convolve(np.real(s_nT), pulse_shape, mode="same")), -1) + 
+    1j * np.roll(np.real(convolve(np.imag(s_nT), pulse_shape, mode="same")), -1), 
     dtype=complex
 )
 
 # 2.3 DOWNSAMPLE EACH PULSE
-x_kTs = DSP.Downsample(x_nT, sample_rate)
+x_kTs = np.array(DSP.Downsample(x_nT, sample_rate))
 
 # 2.5 MAKE A DECISION FOR EACH PULSE
 qpsk = [[complex( 1+ 1j), 3], [complex( 1+-1j), 2], [complex(-1+-1j), 0], [complex(-1+ 1j), 1]]
-detected_bits = communications.nearest_neighbor(x_kTs, qpsk)
-print(f"Transmission Bit Errors: {error_count(b_k, detected_bits)}")
-print(detected_bits)
+detected_ints = communications.nearest_neighbor(x_kTs, qpsk)
+print(f"Transmission Symbol Errors: {error_count(b_k, detected_ints)}")
 
-# Plot original symbols
-plt.figure()
-plt.stem(np.real(a_k))
-plt.title("Original Symbols")
+# 2.6 CONVERT BINARY TO ASCII
+detected_bits = []
+for symbol in detected_ints:
+    detected_bits += ([*bin(symbol)[2:].zfill(2)])
 
-# Plot upsampled symbols
-plt.figure()
-plt.stem(np.real(a_k_upsampled))
-plt.title("Upsampled Symbols")
+message = communications.bin_to_char(detected_bits)
+print(message)
 
-# Plot modulated signal
-plt.figure()
-plt.stem(s_nT_modulated)
-plt.title("Modulated Signal")
+# # Plot original symbols
+# plt.figure()
+# plt.stem(np.imag(a_k))
+# plt.title("Original Symbols")
 
-# Plot demodulated signal
-plt.figure()
-plt.stem(r_nT)
-plt.title("Demodulated Signal")
+# # Plot upsampled symbols
+# plt.figure()
+# plt.stem(np.real(a_k_upsampled))
+# plt.title("Upsampled Symbols")
 
-# Plot match filtered signal
-plt.figure()
-plt.stem(x_nT)
-plt.title("Match Filtered Signal")
+# # Plot modulated signal
+# plt.figure()
+# plt.stem(s_nT_modulated)
+# plt.title("Modulated Signal")
 
-# Plot downsampled signal
-plt.figure()
-plt.stem(np.real(x_kTs))
-plt.title("Downsampled Signal")
-plt.show()
+# # Plot demodulated signal
+# plt.figure()
+# plt.stem(r_nT)
+# plt.title("Demodulated Signal")
+
+# # Plot match filtered signal
+# plt.figure()
+# plt.stem(x_nT)
+# plt.title("Match Filtered Signal")
+
+# # Plot downsampled signal
+# plt.figure()
+# plt.stem(np.imag(x_kTs))
+# plt.title("Downsampled Signal")
+# plt.show()
 
 
