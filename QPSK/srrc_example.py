@@ -41,13 +41,22 @@ def DirectForm2(b, a, x):
         delayLine[0] = x[i]*a[0] + tmp #new value is x[n] * a[0] + sum of left side
     return y[1:]
 
-def convolve(x, h):
-    N = len(x) + len(h) - 1
+def convolve(x, h, mode='full'):
+    if mode not in ['full', 'same']:
+        raise ValueError("Mode must be either 'full' or 'same'")
+    
+    N = len(x) + len(h) - 1 if mode == 'full' else max(len(x), len(h))
     x_padded = np.pad(x, (0, N - len(x)), mode='constant')
     h_padded = np.pad(h, (0, N - len(h)), mode='constant')
     X = np.fft.fft(x_padded)
     H = np.fft.fft(h_padded)
     y = np.fft.ifft(X * H)
+    
+    if mode == 'same':
+        start = (len(h) - 1) // 2
+        end = start + len(x)
+        y = y[start:end]
+    
     return y
    
 def SRRC(alpha, N, length):
@@ -76,18 +85,16 @@ plt.xlabel('Symbol Index')
 plt.ylabel('Amplitude')
 plt.tight_layout()
 
-length_values = [32]
-alpha_values = [.5]
+length_values = [17, 35, 65]
+alpha_values = [.01, .25, .75]
 
-# Create a list to store figures
 figures = []
 
 for length in length_values:
     for alpha in alpha_values:
-        pulse_shape = np.array(SRRC(alpha, upsample_factor, length))
-        result = convolve(test_input_1, pulse_shape)
-        result = convolve(result, np.conjugate(pulse_shape[::-1]))
-        result = np.roll(result, -2)
+        pulse_shape = np.roll(np.array(SRRC(alpha, upsample_factor, length)), -1)
+        result = convolve(test_input_1, pulse_shape, mode="same")
+        # result = convolve(result, np.conjugate(pulse_shape[::-1]))
 
         fig = plt.figure()
         plt.subplot(2, 1, 1)
@@ -102,7 +109,7 @@ for length in length_values:
         plt.ylabel('Amplitude')
 
         plt.tight_layout()
-        
+
         # Append the figure to the list
         figures.append(fig)
 

@@ -8,18 +8,6 @@ from KUSignalLib import MatLab
 from KUSignalLib import communications
 
 
-def local_oscillator_cos(input, f_c, f_s):
-    output = []
-    for i in range(len(input)):
-        output.append(input[i] * np.sqrt(2) * np.cos(2*np.pi*f_c*i/f_s))
-    return output
-
-def local_oscillator_sin(input, f_c, f_s):
-    output = []
-    for i in range(len(input)):
-        output.append(input[i] * -1 * np.sqrt(2) * np.sin(2*np.pi*f_c*i/f_s))
-    return output
-
 def string_to_ascii_binary(string, num_bits=7):
     ascii_binary_strings = []
     for char in string:
@@ -33,7 +21,28 @@ def error_count(x, y):
         if (x[i] != y[i]):
             count += 1
     return count
-    
+
+def convolve(x, h, mode='full'):
+    N = len(x) + len(h) - 1
+    x_padded = np.pad(x, (0, N - len(x)), mode='constant')
+    h_padded = np.pad(h, (0, N - len(h)), mode='constant')
+    X = np.fft.fft(x_padded)
+    H = np.fft.fft(h_padded)
+    y = np.fft.ifft(X * H)
+
+    if mode == 'same':
+        start = (len(h) - 1) // 2
+        end = start + len(x)
+        y = y[start:end]
+    return y
+
+def freq_shift_modulation(input, f_c, f_s, phase_offset=0):
+    indices = np.arange(len(input))
+    complex_exponentials = np.exp(1j * (2 * np.pi * f_c * indices / f_s + phase_offset))
+    output = input * complex_exponentials
+    return output
+
+
 
 sample_rate = 8
 pulse_shape = "NRZ" # change to SRRC (50% excess bandwidth)
@@ -47,7 +56,7 @@ bits_to_amplitude = dict(zip(bits, amplitudes))
 bits_to_bits_str = dict(zip(bits, bits_str))
 
 
-test_input_1 = [0, 1, 2, 3]
+test_input_1 = [0, 0, 0, 2, 0, 0, 2]
 test_input_2 = [3, 2, 1, 0, 1, 2, 3]
 string_input = "will is cool"
 string_input_bin = ''.join(string_to_ascii_binary(string_input))
@@ -60,31 +69,74 @@ b_k = test_input_1
 a_k = [bits_to_amplitude[bit] for bit in b_k]
 a_k_upsampled = DSP.Upsample(a_k, sample_rate, interpolate=False)
 
-# 1.2 NRZ FILTER THE UPSAMPLED SIGNAL (PULSE SHAPING)
-filter_num = [.25/2 for i in range(sample_rate)]
-filter_denom = [1]
-s_nT = np.array(DSP.DirectForm2(filter_num, filter_denom, np.real(a_k_upsampled)) + 1j*DSP.DirectForm2(filter_num, filter_denom, np.imag(a_k_upsampled)))
+# 1.2 PULSE SHAPE THE UPSAMPLED SIGNAL (SRRC)
+length = 64
+alpha = 0.5
+pulse_shape = communications.srrc2(.5, sample_rate, length)
+s_nT = np.array(
+    np.roll(np.real(convolve(np.real(a_k_upsampled), pulse_shape, mode="same")), -1) + 
+    1j * np.roll(np.real(convolve(np.imag(a_k_upsampled), pulse_shape, mode="same")), -1), 
+    dtype=complex
+)
 
 # 1.3 MODULATE ONTO CARRIER USING LOCAL OSCILLATOR 
-carrier_frequency = 2
-s_nT_modulated = np.array(local_oscillator_cos(np.real(s_nT), carrier_frequency, sample_rate) + local_oscillator_sin(np.imag(s_nT), carrier_frequency, sample_rate))
+fc = 1
+s_nT_modulated = np.array(
+    (np.sqrt(2) * freq_shift_modulation(np.real(s_nT), fc, sample_rate, phase_offset=0)) - 
+    (np.sqrt(2) * freq_shift_modulation(np.imag(s_nT), fc, sample_rate, phase_offset=np.pi/2))
+)
 
-# 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
-r_nT = np.array(local_oscillator_cos(s_nT_modulated, carrier_frequency, sample_rate) + 1j*np.array(local_oscillator_sin(s_nT_modulated, carrier_frequency, sample_rate)))
+# # 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
+r_nT = np.array(
+    (np.sqrt(2) * freq_shift_modulation(np.real(s_nT_modulated), fc, sample_rate, phase_offset=0)) - 
+    1j * (np.sqrt(2) * freq_shift_modulation(np.imag(s_nT_modulated), fc, sample_rate, phase_offset=np.pi/2))
+)
 
 # 2.2 MATCH FILTER THE RECEIVED SIGNAL
-x_nT = np.array(DSP.DirectForm2(filter_num, filter_denom, np.real(r_nT)) + 1j*DSP.DirectForm2(filter_num, filter_denom, np.imag(r_nT)))
+x_nT = np.array(
+    np.roll(np.real(convolve(np.real(s_nT_modulated), pulse_shape, mode="same")), -1) + 
+    1j * np.roll(np.real(convolve(np.imag(r_nT), pulse_shape, mode="same")), -1), 
+    dtype=complex
+)
 
 # 2.3 DOWNSAMPLE EACH PULSE
-x_kTs = DSP.Downsample(x_nT[sample_rate:], sample_rate)
-print(np.real(a_k))
-print(np.imag(a_k))
-print(np.real(x_kTs))
-print(np.imag(x_kTs))
+x_kTs = DSP.Downsample(x_nT, sample_rate)
 
 # 2.5 MAKE A DECISION FOR EACH PULSE
 qpsk = [[complex( 1+ 1j), 3], [complex( 1+-1j), 2], [complex(-1+-1j), 0], [complex(-1+ 1j), 1]]
 detected_bits = communications.nearest_neighbor(x_kTs, qpsk)
 print(f"Transmission Bit Errors: {error_count(b_k, detected_bits)}")
 print(detected_bits)
+
+# Plot original symbols
+plt.figure()
+plt.stem(np.real(a_k))
+plt.title("Original Symbols")
+
+# Plot upsampled symbols
+plt.figure()
+plt.stem(np.real(a_k_upsampled))
+plt.title("Upsampled Symbols")
+
+# Plot modulated signal
+plt.figure()
+plt.stem(s_nT_modulated)
+plt.title("Modulated Signal")
+
+# Plot demodulated signal
+plt.figure()
+plt.stem(r_nT)
+plt.title("Demodulated Signal")
+
+# Plot match filtered signal
+plt.figure()
+plt.stem(x_nT)
+plt.title("Match Filtered Signal")
+
+# Plot downsampled signal
+plt.figure()
+plt.stem(np.real(x_kTs))
+plt.title("Downsampled Signal")
+plt.show()
+
 
