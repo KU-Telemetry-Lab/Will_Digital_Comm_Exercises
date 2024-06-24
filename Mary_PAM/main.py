@@ -118,22 +118,4 @@ plt.title('x_nT')
 plt.xlabel('Index')
 plt.ylabel('Value')
 
-plt.show()
-
-
-# 3 TEST SYSTEM ON GIVEN ASCII DATA
-test_file = "bb8data.mat"
-input_message_length = 140 # symbols = 420 bits = 60 ascii chars
-r_nT = MatLab.loadMatLabFile(test_file)[1]
-
-filter_num = [.25/3 for i in range(sample_rate)]
-filter_denom = [1]
-padding_length = max(len(filter_num), len(filter_denom))
-x_nT = DSP.DirectForm2(np.array(filter_num), np.array(filter_denom), r_nT)
-
-x_kTs = DSP.Downsample(x_nT[sample_rate:], sample_rate)
-
-detected_ints = Communications.nearest_neighbor(x_kTs, mary_pam)
-
-char_message = Communications.bin_to_ascii(detected_bits)
-print(char_message)
+# plt.show()

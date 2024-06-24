@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, '../KUSignalLib/src')
-from KUSignalLib import DSP, PLL
+from KUSignalLib import DSP
 from KUSignalLib import MatLab
 from KUSignalLib import communications
 
@@ -21,26 +21,6 @@ def error_count(x, y):
         if (x[i] != y[i]):
             count += 1
     return count
-
-def convolve(x, h, mode='full'):
-    N = len(x) + len(h) - 1
-    x_padded = np.pad(x, (0, N - len(x)), mode='constant')
-    h_padded = np.pad(h, (0, N - len(h)), mode='constant')
-    X = np.fft.fft(x_padded)
-    H = np.fft.fft(h_padded)
-    y = np.fft.ifft(X * H)
-
-    if mode == 'same':
-        start = (len(h) - 1) // 2
-        end = start + len(x)
-        y = y[start:end]
-    return y
-
-def freq_shift_modulation(input, f_c, f_s):
-    indices = np.arange(len(input))
-    complex_exponentials = np.exp(-1j * (2 * np.pi * f_c * indices / f_s))
-    output = input * complex_exponentials
-    return output
 
 sample_rate = 8
 carrier_frequency = 0.25*sample_rate
@@ -73,8 +53,8 @@ a_k_upsampled_imag = np.imag(a_k_upsampled)
 length = 64
 alpha = 0.5
 pulse_shape = communications.srrc(.5, sample_rate, length)
-s_nT_real = np.real(np.roll(convolve(a_k_upsampled_real, pulse_shape, mode="same"), -1))
-s_nT_imag = np.real(np.roll(convolve(a_k_upsampled_imag, pulse_shape, mode="same"), -1))
+s_nT_real = np.real(np.roll(DSP.convolve(a_k_upsampled_real, pulse_shape, mode="same"), -1))
+s_nT_imag = np.real(np.roll(DSP.convolve(a_k_upsampled_imag, pulse_shape, mode="same"), -1))
 
 # 1.3 MODULATE ONTO CARRIER USING LOCAL OSCILLATOR
 s_nT_modulated = (
@@ -87,8 +67,8 @@ r_nT_real = np.array(np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_modul
 r_nT_imag = np.array(np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_nT_modulated, carrier_frequency, sample_rate)))
 
 # 2.2 MATCH FILTER THE RECEIVED SIGNAL
-x_nT_real = np.real(np.roll(convolve(r_nT_real, pulse_shape, mode="same"), -1))
-x_nT_imag = np.real(np.roll(convolve(r_nT_imag, pulse_shape, mode="same"), -1))
+x_nT_real = np.real(np.roll(DSP.convolve(r_nT_real, pulse_shape, mode="same"), -1))
+x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -1))
 
 # 2.3 DOWNSAMPLE EACH PULSE
 x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate))
@@ -140,21 +120,3 @@ print(message)
 # plt.show()
 
 
-# # 3 TEST SYSTEM ON GIVEN ASCII DATA
-# test_file = "qpskdata.mat"
-# modulated_data = MatLab.load_matlab_file(test_file)[1]
-# input_message_length = 0
-# data_offset = 12
-# carrier_frequency = 2
-# sample_rate = 8
-# pulse_shape = communications.srrc(.5, sample_rate, 32)
-
-# r_nT = np.array(np.sqrt(2) * freq_shift_modulation(modulated_data, carrier_frequency, sample_rate), dtype=complex)
-# x_nT = np.array(np.roll(np.convolve(r_nT, pulse_shape, mode="full"), -1), dtype=complex)
-# x_kTs = DSP.downsample(x_nT, sample_rate, offset=sample_rate)
-# detected_symbols = communications.nearest_neighbor(x_kTs, qpsk_constellation)
-# detected_bits = []
-# for symbol in detected_symbols:
-#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
-# message = communications.bin_to_char(detected_bits[data_offset:])
-# print(message)

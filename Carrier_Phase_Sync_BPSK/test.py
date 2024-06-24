@@ -7,13 +7,6 @@ from KUSignalLib import DSP, PLL
 from KUSignalLib import MatLab
 from KUSignalLib import communications
 
-def modulate_by_exponential(x, f_c, f_s, phase_offset=0):
-    y = []
-    for i, value in enumerate(x):
-        modulation_factor = np.exp(1j * 2 * np.pi * f_c * i / f_s + phase_offset)
-        y.append(value * modulation_factor)
-    return np.array(y)
-
 def find_subarray_index(small_array, large_array):
     small_len = len(small_array)
     large_len = len(large_array)
@@ -29,7 +22,6 @@ def string_to_ascii_binary(string, num_bits=7):
         ascii_binary_strings.append(ascii_binary)
     return ascii_binary_strings
 
-
 sample_rate = 8
 carrier_frequency = sample_rate * 0.2
 pulse_shape = "SRRC"
@@ -44,42 +36,22 @@ amplitude_to_bits = dict(zip(amplitudes, bits))
 bits_to_amplitude = dict(zip(bits, amplitudes))
 bits_to_bin_str = dict(zip(bits, bin_strs))
 
-test_input_1 = [1, 0, 0, 1]
-test_input_2 = [1, 1, 0, 0, 1, 1, 0, 0]
-string_input = "will is cool, this is a test"
-test_input_3 = [int(num) for num in ''.join(string_to_ascii_binary(string_input))]
-
-# 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
-b_k = header + unique_word + test_input_3
-a_k = [bits_to_amplitude[bit] for bit in b_k]
-a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate=False)
-a_k_upsampled_real = np.real(a_k_upsampled)
-a_k_upsampled_imag = np.imag(a_k_upsampled)
-
-# 1.2 PULSE SHAPE THE UPSAMPLED SIGNAL (SRRC)
+# TEST ON GIVEN ASACII DATA
+sample_rate
+test_file = "bpskcruwdata.mat"
+data_offset = 16
+input_message_length = 2247
+modulated_data = header + list(MatLab.load_matlab_file(test_file)[1])
 length = 64
 alpha = 0.5
 pulse_shape = communications.srrc(.5, sample_rate, length)
-s_nT_real = np.real(np.roll(DSP.convolve(a_k_upsampled_real, pulse_shape, mode="same"), -1))
-s_nT_imag = np.real(np.roll(DSP.convolve(a_k_upsampled_imag, pulse_shape, mode="same"), -1))
 
-# 1.3 MODULATE ONTO CARRIER USING LOCAL OSCILLATOR
-s_nT_modulated = (
-    np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_real, carrier_frequency, sample_rate)) +
-    np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_nT_imag, carrier_frequency, sample_rate))
-)
-
-# 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
-r_nT_real = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_modulated, carrier_frequency, sample_rate))
-r_nT_imag = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_nT_modulated, carrier_frequency, sample_rate))
-
-# 2.2 MATCH FILTER THE RECEIVED SIGNAL
+r_nT_real = np.sqrt(2) * np.real(DSP.modulate_by_exponential(modulated_data, carrier_frequency, sample_rate))
+r_nT_imag = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(modulated_data, carrier_frequency, sample_rate))
 x_nT_real = np.real(np.roll(DSP.convolve(r_nT_real, pulse_shape, mode="same"), -1))
 x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -1))
-
-# 2.3 DOWNSAMPLE EACH PULSE
-x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate))
-x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate))
+x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate, offset=0))
+x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate, offset=0))
 
 B = 0.02 * sample_rate
 fs = sample_rate
@@ -97,8 +69,8 @@ sample_indexes = np.arange(len(x_kTs_real))
 
 for sample_index in sample_indexes:
     # ccw rotation via mixing
-    x_kTs_real_ccwr = modulate_by_exponential([x_kTs_real[sample_index]], np.real(dds_output), sample_rate)
-    x_kTs_imag_ccwr = modulate_by_exponential([x_kTs_imag[sample_index]], np.imag(dds_output), sample_rate)
+    x_kTs_real_ccwr = DSP.modulate_by_exponential([x_kTs_real[sample_index]], np.real(dds_output), sample_rate)
+    x_kTs_imag_ccwr = DSP.modulate_by_exponential([x_kTs_imag[sample_index]], np.imag(dds_output), sample_rate)
 
     # decision
     bpsk_constellation = [[complex(-1+0j), 0], [complex(1+0j), 1]]
@@ -112,6 +84,7 @@ for sample_index in sample_indexes:
     dds_output = pll.DDS(sample_index, loop_filter_output[0])
 
 uw_start_index = find_subarray_index(unique_word, detected_bits)
-detected_bits = detected_bits[uw_start_index + len(unique_word): uw_start_index + len(unique_word) + len(b_k)]
-message = communications.bin_to_char(detected_bits)
-print(message)
+print(uw_start_index)
+# detected_bits = detected_bits[uw_start_index + len(unique_word): uw_start_index + len(unique_word) + input_message_length]
+# message = communications.bin_to_char(detected_bits)
+# print(message)
