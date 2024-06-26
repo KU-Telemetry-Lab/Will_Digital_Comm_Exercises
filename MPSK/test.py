@@ -12,23 +12,27 @@ sample_rate = 8
 carrier_frequency = 0.25*sample_rate
 symbol_clock_offset = 0
 
-qpsk_constellation = [
-    [complex( np.sqrt(4.5)+ np.sqrt(4.5)*1j), 3], 
-    [complex( np.sqrt(4.5)+-np.sqrt(4.5)*1j), 2], 
-    [complex(-np.sqrt(4.5)+-np.sqrt(4.5)*1j), 0], 
-    [complex(-np.sqrt(4.5)+ np.sqrt(4.5)*1j), 1]
+mpsk_constellation = [
+    [complex(3 + 0*1j), 0],
+    [complex(np.sqrt(4.5) + np.sqrt(4.5)*1j), 1],
+    [complex(0 + 3*1j), 3],
+    [complex(-np.sqrt(4.5) + np.sqrt(4.5)*1j), 2],
+    [complex(-3 + 0*1j), 6],
+    [complex(-np.sqrt(4.5) + -np.sqrt(4.5)*1j), 7],
+    [complex(0 + -3*1j), 5],
+    [complex(np.sqrt(4.5) + -np.sqrt(4.5)*1j), 4]
 ]
 
-bits = [i[1] for i in qpsk_constellation]
-bits_str = ['11', '10', '00', '01']
-amplitudes = [i[0] for i in qpsk_constellation]
+bits = [i[1] for i in mpsk_constellation]
+bits_str = ['000', '001', '011', '010', '110', '111', '101', '100']
+amplitudes = [i[0] for i in mpsk_constellation]
 amplitude_to_bits = dict(zip(amplitudes, bits))
 bits_to_amplitude = dict(zip(bits, amplitudes))
 bits_to_bits_str = dict(zip(bits, bits_str))
 
 
 # TEST SYSTEM ON GIVEN ASCII DATA
-test_file = "qpskdata.mat"
+test_file = "psk8data.mat"
 modulated_data = MatLab.load_matlab_file(test_file)[1]
 data_offset = 12
 sample_rate = 8
@@ -45,9 +49,9 @@ x_kTs = x_kTs_real + 1j * x_kTs_imag
 
 # DSP.plot_complex_points(x_kTs, referencePoints=amplitudes) # plotting received constellations
 
-detected_symbols = communications.nearest_neighbor(x_kTs, qpsk_constellation)
+detected_symbols = communications.nearest_neighbor(x_kTs, mpsk_constellation)[data_offset:]
 detected_bits = []
 for symbol in detected_symbols:
     detected_bits += list(bits_to_bits_str[symbol])
-message = communications.bin_to_char(detected_bits[data_offset:])
+message = communications.bin_to_char(detected_bits)
 print(message)

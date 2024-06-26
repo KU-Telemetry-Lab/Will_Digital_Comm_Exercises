@@ -22,18 +22,26 @@ def error_count(x, y):
             count += 1
     return count
 
+
 # SYSTEM PARAMETERS
 sample_rate = 8
 carrier_frequency = 0.25*sample_rate
 symbol_clock_offset = 0
-qpsk_constellation = [[complex( np.sqrt(4.5)+ np.sqrt(4.5)*1j), 3], 
-                      [complex( np.sqrt(4.5)+-np.sqrt(4.5)*1j), 2], 
-                      [complex(-np.sqrt(4.5)+-np.sqrt(4.5)*1j), 0], 
-                      [complex(-np.sqrt(4.5)+ np.sqrt(4.5)*1j), 1]]
 
-bits = [i[1] for i in qpsk_constellation]
-bits_str = ['11', '10', '00', '01']
-amplitudes = [i[0] for i in qpsk_constellation]
+mpsk_constellation = [
+    [complex(3 + 0*1j), 0],
+    [complex(np.sqrt(4.5) + np.sqrt(4.5)*1j), 1],
+    [complex(0 + 3*1j), 3],
+    [complex(-np.sqrt(4.5) + np.sqrt(4.5)*1j), 2],
+    [complex(-3 + 0*1j), 6],
+    [complex(-np.sqrt(4.5) + -np.sqrt(4.5)*1j), 7],
+    [complex(0 + -3*1j), 5],
+    [complex(np.sqrt(4.5) + -np.sqrt(4.5)*1j), 4]
+]
+
+bits = [i[1] for i in mpsk_constellation]
+bits_str = ['000', '001', '011', '010', '110', '111', '101', '100']
+amplitudes = [i[0] for i in mpsk_constellation]
 amplitude_to_bits = dict(zip(amplitudes, bits))
 bits_to_amplitude = dict(zip(bits, amplitudes))
 bits_to_bits_str = dict(zip(bits, bits_str))
@@ -43,7 +51,7 @@ test_input_1 = [1, 0, 0, 1, 0, 0]
 test_input_2 = [3, 2, 1, 0, 1, 2, 3]
 string_input = "will is cool, this is a test"
 string_input_bin = ''.join(string_to_ascii_binary(string_input))
-input_bin_blocks = [string_input_bin[i:i+2] for i in range(0, len(string_input_bin), 2)]
+input_bin_blocks = [string_input_bin[i:i+3] for i in range(0, len(string_input_bin), 3)]
 test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 
 
@@ -81,47 +89,12 @@ x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate))
 x_kTs = x_kTs_real + 1j * x_kTs_imag
 
 # 2.5 MAKE A DECISION FOR EACH PULSE
-qpsk_constellation = [[complex( 1+ 1j), 3], [complex( 1+-1j), 2], [complex(-1+-1j), 0], [complex(-1+ 1j), 1]]
-detected_ints = communications.nearest_neighbor(x_kTs[len(header):], qpsk_constellation)
+detected_ints = communications.nearest_neighbor(x_kTs[len(header):], mpsk_constellation)
 print(f"Transmission Symbol Errors: {error_count(b_k[len(header):], detected_ints)}")
 
-# 2.6 CONVERT BINARY TO ASCII
+# # 2.6 CONVERT BINARY TO ASCII
 detected_bits = []
 for symbol in detected_ints:
-    detected_bits += ([*bin(symbol)[2:].zfill(2)])
-
+    detected_bits += list(bits_to_bits_str[symbol])
 message = communications.bin_to_char(detected_bits)
 print(message)
-
-# # Plot original symbols
-# plt.figure()
-# plt.stem(np.imag(a_k))
-# plt.title("Original Symbols")
-
-# # Plot upsampled symbols
-# plt.figure()
-# plt.stem(np.real(a_k_upsampled))
-# plt.title("Upsampled Symbols")
-
-# # Plot modulated signal
-# plt.figure()
-# plt.stem(s_nT_modulated)
-# plt.title("Modulated Signal")
-
-# # Plot demodulated signal
-# plt.figure()
-# plt.stem(r_nT)
-# plt.title("Demodulated Signal")
-
-# # Plot match filtered signal
-# plt.figure()
-# plt.stem(x_nT)
-# plt.title("Match Filtered Signal")
-
-# # Plot downsampled signal
-# plt.figure()
-# plt.stem(np.imag(x_kTs))
-# plt.title("Downsampled Signal")
-# plt.show()
-
-

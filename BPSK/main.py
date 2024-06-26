@@ -50,10 +50,10 @@ pulse_shape = communications.srrc(.5, sample_rate, length)
 s_nT = np.real(np.array(np.roll(np.real(DSP.convolve(a_k_upsampled, pulse_shape, mode="same")), -1)))
 
 # 1.3 MODULATE ONTO CARRIER USING LOCAL OSCILLATOR 
-s_nT_modulated = np.real(np.array(np.sqrt(2) * np.array(DSP.modulate_by_exponential(s_nT, carrier_frequnecy, sample_rate))))
+s_nT_modulated = np.real(np.array(np.sqrt(2) * DSP.modulate_by_exponential(s_nT, carrier_frequnecy, sample_rate)))
 
 # 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
-r_nT = np.real(np.array(np.sqrt(2) * np.array(DSP.modulate_by_exponential(s_nT_modulated, carrier_frequnecy, sample_rate))))
+r_nT = np.real(np.array(np.sqrt(2) * DSP.modulate_by_exponential(s_nT_modulated, carrier_frequnecy, sample_rate)))
 
 # 2.2 MATCH FILTER THE RECEIVED SIGNAL
 x_nT = np.real(np.array(np.roll(np.real(DSP.convolve(r_nT, pulse_shape, mode="same")), -1)))
