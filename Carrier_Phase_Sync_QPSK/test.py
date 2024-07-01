@@ -79,12 +79,15 @@ for sample_index in sample_indexes:
     detected_bits.append(detected_bit_real)
 
     # input to pll
-    phase_detector_output = pll.PhaseDetector(x_kTs_real_ccwr + 1j*x_kTs_imag_ccwr, detected_bit_real + 1j*detcted_bit_imag)
-    loop_filter_output = pll.LoopFilter(phase_detector_output)
+    phase_detector_output = pll.phase_detector(x_kTs_real_ccwr + 1j*x_kTs_imag_ccwr, detected_bit_real + 1j*detcted_bit_imag)
+    loop_filter_output = pll.loop_filter(phase_detector_output)
     dds_output = pll.DDS(sample_index, loop_filter_output[0])
 
 uw_start_index = find_subarray_index(unique_word, detected_bits)
-print(uw_start_index)
+if uw_start_index == -1:
+    uw_start_index = find_subarray_index(unique_word[::-1], detected_bits)
+    
+
 # detected_bits = detected_bits[uw_start_index + len(unique_word): uw_start_index + len(unique_word) + input_message_length]
 # message = communications.bin_to_char(detected_bits)
 # print(message)
