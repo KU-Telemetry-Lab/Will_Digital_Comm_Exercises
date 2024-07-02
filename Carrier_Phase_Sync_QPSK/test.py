@@ -23,21 +23,23 @@ def string_to_ascii_binary(string, num_bits=7):
     return ascii_binary_strings
 
 sample_rate = 8
-carrier_frequency = sample_rate * 0.2
-pulse_shape = "SRRC"
+carrier_frequency = 0.3*sample_rate
+symbol_clock_offset = 0
+qpsk_constellation = [[complex( np.sqrt(1)+ np.sqrt(1)*1j), 3], 
+                      [complex( np.sqrt(1)+-np.sqrt(1)*1j), 2], 
+                      [complex(-np.sqrt(1)+-np.sqrt(1)*1j), 0], 
+                      [complex(-np.sqrt(1)+ np.sqrt(1)*1j), 1]]
+
+bits = [i[1] for i in qpsk_constellation]
+bits_str = ['11', '10', '00', '01']
+amplitudes = [i[0] for i in qpsk_constellation]
+amplitude_to_bits = dict(zip(amplitudes, bits))
+bits_to_amplitude = dict(zip(bits, amplitudes))
+bits_to_bits_str = dict(zip(bits, bits_str))
 unique_word = [1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1]
 header = [1, 1, 1, 1]
 
-A = 1
-amplitudes = [-1, 1]
-bits = [0, 1]
-bin_strs = ['0', '1']
-amplitude_to_bits = dict(zip(amplitudes, bits))
-bits_to_amplitude = dict(zip(bits, amplitudes))
-bits_to_bin_str = dict(zip(bits, bin_strs))
-
 # TEST ON GIVEN ASACII DATA
-sample_rate
 test_file = "bpskcruwdata.mat"
 data_offset = 16
 input_message_length = 2247
@@ -50,8 +52,7 @@ r_nT_real = np.sqrt(2) * np.real(DSP.modulate_by_exponential(modulated_data, car
 r_nT_imag = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(modulated_data, carrier_frequency, sample_rate))
 x_nT_real = np.real(np.roll(DSP.convolve(r_nT_real, pulse_shape, mode="same"), -1))
 x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -1))
-x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate, offset=0))
-x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate, offset=0))
+x_kTs = np.array(DSP.downsample(x_nT_real, sample_rate, offset=0)) + 1j * np.array(DSP.downsample(x_nT_imag, sample_rate, offset=0))
 
 B = 0.02 * sample_rate
 fs = sample_rate

@@ -90,11 +90,11 @@ x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -
 # 2.3 DOWNSAMPLE EACH PULSE
 x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate))
 x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate))
-x_kTs = (x_kTs_real + 1j * x_kTs_imag)
+x_kTs = (x_kTs_real + 1j * x_kTs_imag) * np.exp(1j * np.pi/3)
 
 
 # PLL SYSTEM PARAMETERS
-B = 0.06 * sample_rate
+B = 0.02 * sample_rate
 zeta = 1 / np.sqrt(2)
 K0 = 1
 Kp = 1
@@ -136,24 +136,28 @@ for i in range(len(x_kTs)):
     # feed into dds
     dds_output = pll.DDS(i, loop_filter_output)
 
-# normalization? (fix later)
-detected_ints = np.array(detected_ints[len(header):]) / 2
+plt.plot(np.real(rotated_constellation), np.imag(rotated_constellation), 'ro')
+plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo')
+plt.show()
 
-# unique word detection
-received_unique_word = np.array(detected_ints[:len(unique_word)], dtype=int)
+# # normalization? (fix later)
+# detected_ints = np.array(detected_ints[len(header):]) / 2
 
-if np.array(unique_word).tobytes() == invert_array(received_unique_word).tobytes():
-    # rotate entire received signal by pi / 2
-    detected_constellations = np.array(detected_constellations[len(header):], dtype=complex) * np.exp(1j * np.pi)
-    detected_ints = np.array(communications.nearest_neighbor(detected_constellations, qpsk_constellation)[len(unique_word):])
+# # unique word detection
+# received_unique_word = np.array(detected_ints[:len(unique_word)], dtype=int)
 
-detected_ints = np.array(np.round(detected_ints /3), dtype=int).tolist()
+# if np.array(unique_word).tobytes() == invert_array(received_unique_word).tobytes():
+#     # rotate entire received signal by pi / 2
+#     detected_constellations = np.array(detected_constellations[len(header):], dtype=complex) * np.exp(1j * np.pi)
+#     detected_ints = np.array(communications.nearest_neighbor(detected_constellations, qpsk_constellation)[len(unique_word):])
 
-# convert binary to ascii
-detected_bits = []
-for symbol in detected_ints:
-    detected_bits += ([*bin(symbol)[2:].zfill(2)])
+# detected_ints = np.array(np.round(detected_ints /3), dtype=int).tolist()
 
-message = communications.bin_to_char(detected_bits)
-print(message)
+# # convert binary to ascii
+# detected_bits = []
+# for symbol in detected_ints:
+#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
+
+# message = communications.bin_to_char(detected_bits)
+# print(message)
 
