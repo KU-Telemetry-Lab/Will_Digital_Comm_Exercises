@@ -48,9 +48,6 @@ amplitude_to_bits = dict(zip(amplitudes, bits))
 bits_to_amplitude = dict(zip(bits, amplitudes))
 bits_to_bits_str = dict(zip(bits, bits_str))
 
-unique_word = [1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1]
-header = [1, 1, 1, 1]
-
 test_input_1 = [1, 0, 0, 1]
 test_input_2 = [3, 2, 1, 0, 1, 2, 3, 3, 2, 1, 0, 1, 2]
 string_input = "will is cool, this is a test"
@@ -58,6 +55,16 @@ string_input_bin = ''.join(string_to_ascii_binary(string_input))
 input_bin_blocks = [string_input_bin[i:i+2] for i in range(0, len(string_input_bin), 2)]
 test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 
+header = [3, 3, 3, 3]
+unique_word = [0, 1, 2, 3]
+phase_ambiguities = {
+    "0123": 0,
+    "2031": np.pi/2,
+    "3210": np.pi,
+    "1302": 3*np.pi/2
+}
+
+transmitter_phase_offset = np.pi
 
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
 b_k = header + unique_word + test_input_3
@@ -77,7 +84,7 @@ s_nT_imag = np.real(np.roll(DSP.convolve(a_k_upsampled_imag, pulse_shape, mode="
 s_nT_modulated = (
     np.array(np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_real, carrier_frequency, sample_rate))) +
     np.array(np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_nT_imag, carrier_frequency, sample_rate)))
-)
+) * np.exp(1j * transmitter_phase_offset)
 
 # 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
 r_nT_real = np.array(np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_modulated, carrier_frequency, sample_rate)))
@@ -90,11 +97,10 @@ x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -
 # 2.3 DOWNSAMPLE EACH PULSE
 x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate))
 x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate))
-x_kTs = (x_kTs_real + 1j * x_kTs_imag) * np.exp(1j * np.pi/5)
-
+x_kTs = (x_kTs_real + 1j * x_kTs_imag)[len(header):] # remove header
 
 # PLL SYSTEM PARAMETERS
-B = 0.005 * sample_rate
+B = 0.02 * sample_rate
 zeta = 1 / np.sqrt(2)
 K0 = 1
 Kp = 1
@@ -129,18 +135,26 @@ for i in range(len(x_kTs)):
     # generate next dds output
     dds_output = np.exp(1j * loop_filter_output)
 
-detected_ints = communications.nearest_neighbor(detected_constellations[len(header) + len(unique_word):], qpsk_constellation)
+# unique word resolution
+received_unique_word = communications.nearest_neighbor(detected_constellations[: len(unique_word)], qpsk_constellation)
+received_unique_word_string = ""
+for symbol in received_unique_word:
+    received_unique_word_string += str(symbol)
+
+detected_constellations = np.array(detected_constellations) * np.exp(-1j * phase_ambiguities[received_unique_word_string])
+
+detected_ints = communications.nearest_neighbor(detected_constellations[len(unique_word):], qpsk_constellation)
 print(f"Transmission Symbol Errors: {error_count(b_k[len(header) + len(unique_word):], detected_ints)}")
 
-# plt.plot(np.real(rotated_constellation), np.imag(rotated_constellation), 'ro')
-# plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo')
-# plt.show()
+plt.plot(np.real(rotated_constellation), np.imag(rotated_constellation), 'ro')
+plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo')
+plt.show()
 
 # print(f"b_k: {b_k[len(header) + len(unique_word):]}")
 # print(f"detected_ints: {detected_ints}")
 
-# print(f"x_kTs: {x_kTs[len(header) + len(unique_word):]}")
-# print(f"detected_constellations: {detected_constellations[len(header) + len(unique_word):]}")
+# print(f"x_kTs: {x_kTs[len(unique_word):]}")
+# print(f"detected_constellations: {detected_constellations[len(unique_word):]}")
 
 detected_bits = []
 for symbol in detected_ints:
