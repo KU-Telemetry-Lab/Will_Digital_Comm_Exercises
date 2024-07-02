@@ -38,8 +38,7 @@ amplitude_to_bits = dict(zip(amplitudes, bits))
 bits_to_amplitude = dict(zip(bits, amplitudes))
 bits_to_bits_str = dict(zip(bits, bits_str))
 
-unique_word = [1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1]
-header = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+header = [1, 1, 1, 1]
 
 test_input_1 = [1, 0, 0, 1]
 test_input_2 = [3, 2, 1, 0, 1, 2, 3]
