@@ -50,12 +50,12 @@ bits_to_bits_str = dict(zip(bits, bits_str))
 
 test_input_1 = [1, 0, 0, 1]
 test_input_2 = [3, 2, 1, 0, 1, 2, 3, 3, 2, 1, 0, 1, 2]
-string_input = "will is cool, this is a test"
+string_input = "this is a decision directed carrier phase synchronization test using 2 bit quadrture amplitude modulation! "
 string_input_bin = ''.join(string_to_ascii_binary(string_input))
 input_bin_blocks = [string_input_bin[i:i+2] for i in range(0, len(string_input_bin), 2)]
 test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 
-header = [3, 3, 3, 3]
+header = (3 * np.ones(20, dtype=int)).tolist()
 unique_word = [0, 1, 2, 3]
 phase_ambiguities = {
     "0123": 0,
@@ -64,7 +64,7 @@ phase_ambiguities = {
     "1302": 3*np.pi/2
 }
 
-transmitter_phase_offset = np.pi
+transmitter_phase_offset = np.pi/5
 
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
 b_k = header + unique_word + test_input_3
@@ -110,15 +110,14 @@ K2 = ((4) / (zeta + (1 / (4 * zeta))) ** 2) * (((B * (1 / sample_rate)) ** 2) / 
 pll = PLL.PLL(Kp, K0, K1, K2, carrier_frequency, sample_rate)
 
 dds_output = np.exp(1j * 0)
-rotated_constellation = []
+rotated_constellations = []
 detected_constellations = []
-
 pll_error = []
 
 for i in range(len(x_kTs)):
     # perform ccw rotation
     x_kTs_ccwr = x_kTs[i] * dds_output
-    rotated_constellation.append(x_kTs_ccwr)
+    rotated_constellations.append(x_kTs_ccwr)
 
     # find nearest neighbor constellation
     detected_int = communications.nearest_neighbor([x_kTs_ccwr], qpsk_constellation)[0]
@@ -146,7 +145,7 @@ detected_constellations = np.array(detected_constellations) * np.exp(-1j * phase
 detected_ints = communications.nearest_neighbor(detected_constellations[len(unique_word):], qpsk_constellation)
 print(f"Transmission Symbol Errors: {error_count(b_k[len(header) + len(unique_word):], detected_ints)}")
 
-plt.plot(np.real(rotated_constellation), np.imag(rotated_constellation), 'ro')
+plt.plot(np.real(rotated_constellations), np.imag(rotated_constellations), 'ro')
 plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo')
 plt.show()
 
