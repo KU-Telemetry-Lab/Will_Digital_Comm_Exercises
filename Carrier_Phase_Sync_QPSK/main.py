@@ -69,7 +69,7 @@ transmitter_phase_offset = np.pi
 transmitter_freq_offset =  0/sample_rate # (Hz)
 
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
-b_k = header + unique_word + test_input_1
+b_k = header + unique_word + test_input_3
 a_k = [bits_to_amplitude[bit] for bit in b_k]
 a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate=False)
 a_k_upsampled_real = np.real(a_k_upsampled)
@@ -99,12 +99,12 @@ x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -
 # 2.3 DOWNSAMPLE EACH PULSE
 x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate))
 x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate))
-x_kTs = (x_kTs_real + 1j * x_kTs_imag) # remove header
+x_kTs = (x_kTs_real + 1j * x_kTs_imag)
 
 # # DEBUGGING!!!
 # detected_ints = communications.nearest_neighbor(x_kTs, qpsk_constellation)
 # print(f"transmitted symbols: {b_k[len(header):]}")
-# print(f"detected symbols: {detected_ints}")
+# print(f"detected symbols: {detected_ints[len(header):]}")
 
 # 3.1 PLL SYSTEM PARAMETERS
 B = 0.005 * sample_rate
@@ -136,54 +136,52 @@ for i in range(len(x_kTs)):
     # generate next dds output
     dds_output = np.exp(1j * loop_filter_output)
 
+# # DEBUGGING!!!
+# plt.plot(pll_error, label='phase error')
+# plt.legend()
+# plt.show()
+
+# remove header
+detected_constellations = detected_constellations[len(header):]
+
 # DEBUGGING!!!
-plt.plot(pll_error, label='phase error')
-plt.legend()
-plt.show()
+# detected_ints = communications.nearest_neighbor(detected_constellations, qpsk_constellation)
+# print(f"transmitted symbols: {b_k[len(header):]}")
+# print(f"detected symbols: {detected_ints}")
 
-#####################
+# print(f"transmitted constellations: {a_k[len(header):]}")
+# print(f"detected constellations: {detected_constellations}")
 
-# # remove header
-# detected_constellations = detected_constellations[len(header):]
+# 3.2 UNIQUE WORD RESOLUTION
+received_unique_word = communications.nearest_neighbor(detected_constellations[:len(unique_word)], qpsk_constellation)
+received_unique_word_string = ""
+for symbol in received_unique_word:
+    received_unique_word_string += str(symbol)
+
+# 3.3 UNIQUE WORD OFFSET ADJUSTMENT
+detected_constellations = np.array(detected_constellations) * np.exp(-1j * phase_ambiguities[received_unique_word_string])
 
 # # DEBUGGING!!!
-# # detected_ints = communications.nearest_neighbor(detected_constellations, qpsk_constellation)
-# # print(f"transmitted symbols: {b_k[len(header):]}")
-# # print(f"detected symbols: {detected_ints}")
+# print(f"transmitted constellations: {a_k[len(header):]}")
+# print(f"detected constellations: {detected_constellations}")
 
-# # print(f"transmitted constellations: {a_k[len(header):]}")
-# # print(f"detected constellations: {detected_constellations}")
+# 4.1 SYMBOL DETECTION AND ERROR CALCULATION
+detected_ints = communications.nearest_neighbor(detected_constellations[len(unique_word):], qpsk_constellation)
+print(f"Transmission Symbol Errors: {error_count(b_k[len(header) + len(unique_word):], detected_ints)}")
 
-# # 3.2 UNIQUE WORD RESOLUTION
-# received_unique_word = communications.nearest_neighbor(detected_constellations[:len(unique_word)], qpsk_constellation)
-# received_unique_word_string = ""
-# for symbol in received_unique_word:
-#     received_unique_word_string += str(symbol)
-
-# # 3.3 UNIQUE WORD OFFSET ADJUSTMENT
-# detected_constellations = np.array(detected_constellations) * np.exp(-1j * phase_ambiguities[received_unique_word_string])
-
-# # # DEBUGGING!!!
-# # print(f"transmitted constellations: {a_k[len(header):]}")
-# # print(f"detected constellations: {detected_constellations}")
-
-# # 4.1 SYMBOL DETECTION AND ERROR CALCULATION
-# detected_ints = communications.nearest_neighbor(detected_constellations[len(unique_word):], qpsk_constellation)
-# print(f"Transmission Symbol Errors: {error_count(b_k[len(header) + len(unique_word):], detected_ints)}")
-
-# # 4.2 CONSTELLATION PLOTTING
-# # plt.plot(np.real(rotated_constellations), np.imag(rotated_constellations), 'ro')
-# # plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo')
-# # plt.show()
+# 4.2 CONSTELLATION PLOTTING
+plt.plot(np.real(rotated_constellations), np.imag(rotated_constellations), 'ro')
+plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo')
+plt.show()
 
 # # # DEBUGGING!!!
 # # print(f"transmitted symbols: {b_k[len(header) + len(unique_word):]}")
 # # print(f"detected symbols: {detected_ints}")
 
-# # 4.3 MESSAGE DECODING (BIN TO ASCII)
-# detected_bits = []
-# for symbol in detected_ints:
-#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
+# 4.3 MESSAGE DECODING (BIN TO ASCII)
+detected_bits = []
+for symbol in detected_ints:
+    detected_bits += ([*bin(symbol)[2:].zfill(2)])
 
-# message = communications.bin_to_char(detected_bits)
+message = communications.bin_to_char(detected_bits)
 print(message)
