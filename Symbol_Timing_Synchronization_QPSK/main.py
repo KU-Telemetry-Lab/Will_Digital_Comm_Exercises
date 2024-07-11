@@ -49,13 +49,25 @@ class SCS:
         self.timing_error = 0
         self.interpolation_factor = interpolation_factor
 
+        self.loop_bandwidth = 0.2 * samples_per_symbol
+        self.damping_factor = 1/np.sqrt(2)
+        theta_n = self.loop_bandwidth * (1 / self.samples_per_symbol) / (self.damping_factor + 1/(4 * self.damping_factor))
+        self.K1 = self.damping_factor
+        self.K2 = theta_n
         self.LFK2Prev = 0
+
         self.adjusted_symbol_block_real = [0, 0, 0]
         self.adjusted_symbol_block_imag = [0, 0, 0]
 
         self.timing_error_record = []
         self.scs_output_real = []
         self.scs_output_imag = []
+
+    def loop_filter(self, timing_error):
+        LFK2 = self.K2 * timing_error + self.LFK2Prev
+        lf_output = self.K1 * timing_error + LFK2
+        self.LFK2Prev = LFK2
+        return lf_output
 
     def get_timing_error(self):
         return self.timing_error_record
@@ -73,9 +85,6 @@ class SCS:
     def interpolate(self, symbol_block):
         return interpolate(symbol_block, self.interpolation_factor, mode="linear")
 
-    def loop_filter(self):
-        pass
-
     def runner(self):
         for i in range(len(self.input_signal_real)):
             if self.counter == sample_rate:
@@ -88,6 +97,8 @@ class SCS:
                     symbol_block_imag = self.input_signal_imag[i-1:i+2]
             
                 self.timing_error = self.early_late_ted()
+                loop_filter_output = self.loop_filter(self.timing_error)
+                print(loop_filter_output)
 
                 symbol_block_real_upsampled = self.upsample(symbol_block_real)
                 symbol_block_imag_upsampled = self.upsample(symbol_block_imag)
@@ -153,7 +164,7 @@ a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 
 # 1.2 INTRODUCE TIMING OFFSET
-timing_offset = 0.6 # fractional offset in symbols
+timing_offset = 0.0 # fractional offset in symbols
 def fractional_delay(signal, delay):
     n = np.arange(len(signal))
     delayed_signal = np.interp(n - delay, n, signal)
