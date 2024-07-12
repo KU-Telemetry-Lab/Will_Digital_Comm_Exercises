@@ -6,8 +6,8 @@ from scipy import interpolate as intp
 import sys
 sys.path.insert(0, '../KUSignalLib/src')
 from KUSignalLib import DSP
-from KUSignalLib import communications #, SCS
-from SCS import SCS
+from KUSignalLib import communications, SCS
+# from SCS import SCS
 
 def string_to_ascii_binary(string, num_bits=7):
     ascii_binary_strings = []
@@ -110,7 +110,7 @@ a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 
 # 1.2 INTRODUCE TIMING OFFSET
-timing_offset = 0.1 # fractional offset in symbols
+timing_offset = 0.2 # fractional offset in symbols
 a_k_upsampled_real = clock_sync_offset(a_k_upsampled_real, timing_offset)
 a_k_upsampled_imag = clock_sync_offset(a_k_upsampled_imag, timing_offset)
 
@@ -139,33 +139,33 @@ x_nT = x_nT_real + 1j * x_nT_imag
 # 2.3 SYMBOL TIMING ERROR CORRECTION
 loop_bandwidth = 0.02*sample_rate
 damping_factor = 1/np.sqrt(2)
-scs = SCS(x_nT, sample_rate, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, upsample_rate=10)
+scs = SCS.SCS(x_nT, sample_rate, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, upsample_rate=10)
 x_kTs = scs.runner()
-# timing_error_record = scs.get_timing_error()
-# loop_filter_record = scs.get_loop_filter_record()
+timing_error_record = scs.get_timing_error()
+loop_filter_record = scs.get_loop_filter_record()
 
-# # 2.4 MAKE A DECISION FOR EACH PULSE
-# detected_ints = communications.nearest_neighbor(x_kTs, qpsk_constellation)
-# error_count = error_count(b_k[len(header):-len(header)], detected_ints)
-# print(f"Transmission Symbol Errors: {error_count}")
-# print(f"Bit Error Percentage: {round(error_count * 2 / len(detected_ints), 2)} %")
+# 2.4 MAKE A DECISION FOR EACH PULSE
+detected_ints = communications.nearest_neighbor(x_kTs, qpsk_constellation)
+error_count = error_count(b_k[len(header):-len(header)], detected_ints)
+print(f"Transmission Symbol Errors: {error_count}")
+print(f"Bit Error Percentage: {round(error_count * 2 / len(detected_ints), 2)} %")
 
-# # 2.5 CONVERT BINARY TO ASCII
-# detected_bits = []
-# for symbol in detected_ints:
-#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
+# 2.5 CONVERT BINARY TO ASCII
+detected_bits = []
+for symbol in detected_ints:
+    detected_bits += ([*bin(symbol)[2:].zfill(2)])
 
-# message = communications.bin_to_char(detected_bits)
-# print(message)
+message = communications.bin_to_char(detected_bits)
+print(message)
 
 
-# # DEBUGGING!!!
-# plt.figure()
-# plt.stem(timing_error_record)
-# plt.title("Calculated Timing Errors")
+# DEBUGGING!!!
+plt.figure()
+plt.stem(timing_error_record)
+plt.title("Calculated Timing Errors")
 
-# plt.figure()
-# plt.stem(loop_filter_record)
-# plt.title("Loop Filter Outputs")
+plt.figure()
+plt.stem(loop_filter_record)
+plt.title("Loop Filter Outputs")
 
-# plt.show()
+plt.show()
