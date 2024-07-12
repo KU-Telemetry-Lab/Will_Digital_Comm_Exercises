@@ -81,11 +81,11 @@ x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate))
 x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate))
 x_kTs = x_kTs_real + 1j * x_kTs_imag
 
-# 2.5 MAKE A DECISION FOR EACH PULSE
+# 2.4 MAKE A DECISION FOR EACH PULSE
 detected_ints = communications.nearest_neighbor(x_kTs[len(header):], qpsk_constellation)
 print(f"Transmission Symbol Errors: {error_count(b_k[len(header):], detected_ints)}")
 
-# 2.6 CONVERT BINARY TO ASCII
+# 2.5 CONVERT BINARY TO ASCII
 detected_bits = []
 for symbol in detected_ints:
     detected_bits += ([*bin(symbol)[2:].zfill(2)])
