@@ -22,6 +22,59 @@ def error_count(x, y):
             count += 1
     return count
 
+def interpolate(x, n, mode="linear"):
+    """
+    Perform interpolation on an upsampled signal.
+
+    :param x: Input signal (already upsampled with zeros).
+    :param n: Upsampled factor.
+    :param mode: Interpolation type. Modes = "linear", "quadratic".
+    :return: Interpolated signal.
+    """
+    nonzero_indices = np.arange(0, len(x), n)
+    nonzero_values = x[nonzero_indices]
+    interpolation_function = intp.interp1d(nonzero_indices, nonzero_values, kind=mode, fill_value='extrapolate')
+    new_indices = np.arange(len(x))
+    interpolated_signal = interpolation_function(new_indices)
+    return interpolated_signal
+
+def upsample(x, L, offset=0, interpolate_flag=True):
+    """
+    Discrete signal upsample implementation.
+
+    :param x: List or Numpy array type. Input signal.
+    :param L: Int type. Upsample factor.
+    :param offset: Int type. Offset size for input array.
+    :param interpolate: Boolean type. Flag indicating whether to perform interpolation.
+    :return: Numpy array type. Upsampled signal.
+    """
+    x_upsampled = [0] * offset  # Initialize with offset zeros
+    for i, sample in enumerate(x):
+        x_upsampled.append(float(sample))
+        x_upsampled.extend([0] * (L - 1))
+    if interpolate_flag:
+        x_upsampled = interpolate(np.array(x_upsampled), L, mode="linear")
+
+    return np.array(x_upsampled)
+
+# def clock_sync_offset(signal, offset):
+#     n = np.arange(len(signal))
+#     offset_signal = np.interp(n - offset, n, signal)
+#     return offset_signal
+
+def clock_sync_offset(signal, offset):
+    interpolation_factor = 10
+    n = np.zeros(len(signal))
+    signal_interpolated = upsample(signal, interpolation_factor, interpolate_flag=True)
+    for i in range(0, len(signal_interpolated), interpolation_factor):
+        index = i + int(offset * interpolation_factor)
+        if index >= len(n):
+            pass
+        else:
+            n[i] = signal_interpolated[index]
+    return n
+    
+
 # SYSTEM PARAMETERS
 sample_rate = 8
 carrier_frequency = 0.25 * sample_rate
@@ -56,14 +109,9 @@ a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 
 # 1.2 INTRODUCE TIMING OFFSET
-timing_offset = 0.3 # fractional offset in symbols
-def fractional_delay(signal, delay):
-    n = np.arange(len(signal))
-    delayed_signal = np.interp(n - delay, n, signal)
-    return delayed_signal
-
-a_k_upsampled_real = fractional_delay(a_k_upsampled_real, timing_offset * sample_rate)
-a_k_upsampled_imag = fractional_delay(a_k_upsampled_imag, timing_offset * sample_rate)
+timing_offset = 0.1 # fractional offset in symbols
+a_k_upsampled_real = clock_sync_offset(a_k_upsampled_real, timing_offset)
+a_k_upsampled_imag = clock_sync_offset(a_k_upsampled_imag, timing_offset)
 
 # 1.3 PULSE SHAPE (TRANSMIT)
 length = 64
@@ -90,6 +138,8 @@ x_nT = x_nT_real + 1j * x_nT_imag
 # 2.3 SYMBOL TIMING ERROR CORRECTION
 scs = SCS.SCS(x_nT, sample_rate, interpolation_factor=10)
 x_kTs = scs.runner()
+timing_error_record = scs.get_timing_error()
+loop_filter_record = scs.get_loop_filter_record()
 
 # 2.4 MAKE A DECISION FOR EACH PULSE
 detected_ints = communications.nearest_neighbor(x_kTs, qpsk_constellation)
@@ -106,11 +156,13 @@ message = communications.bin_to_char(detected_bits)
 print(message)
 
 
+# DEBUGGING!!!
+plt.figure()
+plt.stem(timing_error_record)
+plt.title("Calculated Timing Errors")
 
+plt.figure()
+plt.stem(loop_filter_record)
+plt.title("Loop Filter Outputs")
 
-# # DEBUGGING!!!
-# plt.figure()
-# plt.stem(scs.get_timing_error())
-# plt.title("Timing Error")
-
-# plt.show()
+plt.show()
