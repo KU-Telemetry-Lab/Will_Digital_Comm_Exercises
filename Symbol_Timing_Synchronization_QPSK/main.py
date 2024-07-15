@@ -22,52 +22,14 @@ def error_count(x, y):
             count += 1
     return count
 
-def interpolate(x, n, mode="linear"):
-    """
-    Perform interpolation on an upsampled signal.
+def apply_clock_offset(signal, sample_rate, samples_per_symbol, offset_fraction):
+    t = np.arange(0, len(signal) / sample_rate, 1 / sample_rate)
+    clock_offset = (samples_per_symbol + 1/sample_rate) * offset_fraction
 
-    :param x: Input signal (already upsampled with zeros).
-    :param n: Upsampled factor.
-    :param mode: Interpolation type. Modes = "linear", "quadratic".
-    :return: Interpolated signal.
-    """
-    nonzero_indices = np.arange(0, len(x), n)
-    nonzero_values = x[nonzero_indices]
-    interpolation_function = intp.interp1d(nonzero_indices, nonzero_values, kind=mode, fill_value='extrapolate')
-    new_indices = np.arange(len(x))
-    interpolated_signal = interpolation_function(new_indices)
-    return interpolated_signal
-
-def upsample(x, L, offset=0, interpolate_flag=True):
-    """
-    Discrete signal upsample implementation.
-
-    :param x: List or Numpy array type. Input signal.
-    :param L: Int type. Upsample factor.
-    :param offset: Int type. Offset size for input array.
-    :param interpolate: Boolean type. Flag indicating whether to perform interpolation.
-    :return: Numpy array type. Upsampled signal.
-    """
-    x_upsampled = [0] * offset  # Initialize with offset zeros
-    for i, sample in enumerate(x):
-        x_upsampled.append(float(sample))
-        x_upsampled.extend([0] * (L - 1))
-    if interpolate_flag:
-        x_upsampled = interpolate(np.array(x_upsampled), L, mode="linear")
-
-    return np.array(x_upsampled)
-
-def clock_sync_offset(signal, offset):
-    interpolation_factor = 10
-    n = np.zeros(len(signal))
-    signal_interpolated = upsample(signal, interpolation_factor, interpolate_flag=True)
-    for i in range(0, len(signal_interpolated), interpolation_factor):
-        index = i + int(offset * interpolation_factor)
-        if index >= len(n):
-            pass
-        else:
-            n[i] = signal_interpolated[index]
-    return n
+    interpolator = intp.interp1d(t, signal, kind='linear', fill_value='extrapolate')
+    t_shifted = t + clock_offset  # Shift the time vector
+    x_shifted = interpolator(t_shifted)  # Get the shifted signal
+    return x_shifted
 
 # SYSTEM PARAMETERS
 sample_rate = 8
@@ -94,18 +56,28 @@ test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 
 # SYNCHRONIZATION PARAMETERS
 header = (3 * np.ones(10, dtype=int)).tolist()
-timing_offset = 0.0 # fractional offset in symbols
+timing_offset = 0.01 # fractional offset in symbols
 
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
 b_k = header + test_input_2 + header
 a_k = [bits_to_amplitude[bit] for bit in b_k]
-a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate=False)
+a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate_flag=False)
 a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 
+plt.figure()
+plt.stem(a_k_upsampled_imag)
+plt.title("Non Offset")
+
 # 1.2 INTRODUCE TIMING OFFSET
-a_k_upsampled_real = clock_sync_offset(a_k_upsampled_real, timing_offset)
-a_k_upsampled_imag = clock_sync_offset(a_k_upsampled_imag, timing_offset)
+a_k_upsampled_real = apply_clock_offset(a_k_upsampled_real, sample_rate, sample_rate, timing_offset)
+a_k_upsampled_imag = apply_clock_offset(a_k_upsampled_imag, sample_rate, sample_rate, timing_offset)
+
+plt.figure()
+plt.stem(a_k_upsampled_imag)
+plt.title("Offset")
+plt.show()
+
 
 # 1.3 PULSE SHAPE (TRANSMIT)
 length = 64
@@ -162,6 +134,7 @@ print(f"Bit Error Percentage: {round(error_count * 2 / len(detected_ints), 2)} %
 
 
 # # DEBUGGING!!!
+# 2.3 DOWNSAMPLE EACH PULSE
 print(f"Expected Symbols: {b_k[len(header): -len(header)]}")
 print(f"Detected Symbols: {detected_ints}")
 
