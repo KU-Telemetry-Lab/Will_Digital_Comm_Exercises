@@ -43,7 +43,7 @@ x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate))
 x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate))
 x_kTs = x_kTs_real + 1j * x_kTs_imag
 
-# DSP.plot_complex_points(x_kTs, referencePoints=amplitudes) # plotting received constellations
+DSP.plot_complex_points(x_kTs, referencePoints=amplitudes) # plotting received constellations
 
 detected_symbols = communications.nearest_neighbor(x_kTs, qpsk_constellation)
 detected_bits = []

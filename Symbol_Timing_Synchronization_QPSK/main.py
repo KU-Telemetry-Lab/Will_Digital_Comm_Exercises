@@ -47,9 +47,9 @@ amplitude_to_bits = dict(zip(amplitudes, bits))
 bits_to_amplitude = dict(zip(bits, amplitudes))
 bits_to_bits_str = dict(zip(bits, bits_str))
 
-test_input_1 = [1]
+test_input_1 = [3, 3, 3, 3, 3, 3, 3]
 test_input_2 = [3, 2, 1, 0, 1, 2, 3]
-string_input = "this is a symbol timing error syncronization test and was developed by William Powers "
+string_input = " \nthis is a symbol timing error syncronization test and was developed by William Powers\n "
 string_input_bin = ''.join(string_to_ascii_binary(string_input))
 input_bin_blocks = [string_input_bin[i:i + 2] for i in range(0, len(string_input_bin), 2)]
 test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
@@ -59,7 +59,7 @@ header = (3 * np.ones(10, dtype=int)).tolist()
 timing_offset = 0.5 # fractional offset in symbols
 
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
-b_k = header + test_input_2 + header
+b_k = header + test_input_3 + header
 a_k = [bits_to_amplitude[bit] for bit in b_k]
 a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate_flag=False)
 a_k_upsampled_real = np.real(a_k_upsampled)
@@ -87,14 +87,14 @@ r_nT_real = np.array(np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_modul
 r_nT_imag = np.array(np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_nT_modulated, carrier_frequency, sample_rate)))
 
 # 2.2 MATCH FILTER RECEIVED SIGNAL (AND REMOVE HEADER AND TAIL)
-x_nT_real = np.real(np.roll(DSP.convolve(r_nT_real, pulse_shape, mode="same"), -1))[len(header)*sample_rate:-len(header)*sample_rate]
-x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -1))[len(header)*sample_rate:-len(header)*sample_rate]
+x_nT_real = np.real(np.roll(DSP.convolve(r_nT_real, pulse_shape, mode="same"), -1))
+x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -1))
 x_nT = x_nT_real + 1j * x_nT_imag
 
-# 2.3 SYMBOL TIMING ERROR CORRECTION
+# 2.3 SYMBOL TIMING SYNCHRONIZATION
 loop_bandwidth = 0.02*sample_rate
 damping_factor = 1/np.sqrt(2)
-scs = SCS.SCS(sample_rate, mode="argmax", loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, upsample_rate=10)
+scs = SCS.SCS(sample_rate, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, upsample_rate=10)
 
 for i in range(len(x_nT)):
     if i == 0: # edge case (start)
@@ -104,9 +104,19 @@ for i in range(len(x_nT)):
     else:
         scs.insert_new_sample(x_nT[i-1], x_nT[i], x_nT[i+1])
 
-x_kTs = scs.get_scs_output_record()
+x_kTs = scs.get_scs_output_record()[len(header): -len(header)] # remove header
 timing_error_record = scs.get_timing_error_record()
 loop_filter_record = scs.get_loop_filter_record()
+
+DSP.plot_complex_points(x_kTs, referencePoints=amplitudes) # plotting received constellations
+
+plt.figure()
+plt.stem(timing_error_record, "ro", label="TED")
+plt.stem(loop_filter_record, "bo", label="Loop Filter")
+plt.title("Synchronization Error Records")
+plt.legend()
+plt.show()
+
 
 # 2.4 MAKE A DECISION FOR EACH PULSE
 detected_ints = communications.nearest_neighbor(x_kTs, qpsk_constellation)
@@ -114,30 +124,10 @@ error_count = error_count(b_k[len(header):-len(header)], detected_ints)
 print(f"Transmission Symbol Errors: {error_count}")
 print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_ints), 2)} %")
 
-# # 2.5 CONVERT BINARY TO ASCII
-# detected_bits = []
-# for symbol in detected_ints:
-#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
+# 2.5 CONVERT BINARY TO ASCII
+detected_bits = []
+for symbol in detected_ints:
+    detected_bits += ([*bin(symbol)[2:].zfill(2)])
 
-# message = communications.bin_to_char(detected_bits)
-# print(message)
-
-
-# # DEBUGGING!!!
-# 2.3 DOWNSAMPLE EACH PULSE
-print(f"Expected Symbols: {b_k[len(header): -len(header)]}")
-print(f"Detected Symbols: {detected_ints}")
-
-# plt.figure()
-# plt.stem(np.imag(x_kTs))
-# plt.title("Symbol Clock Synchronization Output")
-
-# plt.figure()
-# plt.stem(timing_error_record)
-# plt.title("Calculated Timing Errors")
-
-# plt.figure()
-# plt.stem(loop_filter_record)
-# plt.title("Loop Filter Outputs")
-
-plt.show()
+message = communications.bin_to_char(detected_bits)
+print(message)
