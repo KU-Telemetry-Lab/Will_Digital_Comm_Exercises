@@ -33,7 +33,7 @@ def find_subarray_index(small_array, large_array):
 def invert_array(x):
     return np.array([0 if value == 1 else 1 for value in x])
 
-def clock_offset(signal, sample_rate, samples_per_symbol, offset_fraction):
+def clock_offset(signal, sample_rate, offset_fraction):
     t = np.arange(0, len(signal) / sample_rate, 1 / sample_rate)
     clock_offset = (1/sample_rate) * offset_fraction
 
@@ -92,8 +92,8 @@ a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 
 # 1.2 INTRODUCE TIMING OFFSET
-a_k_upsampled_real = clock_offset(a_k_upsampled_real, sample_rate, sample_rate, timing_offset)
-a_k_upsampled_imag = clock_offset(a_k_upsampled_imag, sample_rate, sample_rate, timing_offset)
+a_k_upsampled_real = clock_offset(a_k_upsampled_real, sample_rate, timing_offset)
+a_k_upsampled_imag = clock_offset(a_k_upsampled_imag, sample_rate, timing_offset)
 
 # 1.3 PULSE SHAPE THE UPSAMPLED SIGNAL (SRRC)
 length = 64
