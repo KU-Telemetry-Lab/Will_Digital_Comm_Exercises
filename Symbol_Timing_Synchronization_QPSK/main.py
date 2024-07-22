@@ -22,7 +22,7 @@ def error_count(x, y):
             count += 1
     return count
 
-def apply_clock_offset(signal, sample_rate, samples_per_symbol, offset_fraction):
+def clock_offset(signal, sample_rate, samples_per_symbol, offset_fraction):
     t = np.arange(0, len(signal) / sample_rate, 1 / sample_rate)
     clock_offset = (1/sample_rate) * offset_fraction
 
@@ -32,7 +32,7 @@ def apply_clock_offset(signal, sample_rate, samples_per_symbol, offset_fraction)
     return x_shifted
 
 # SYSTEM PARAMETERS
-sample_rate = 8
+sample_rate = 4
 carrier_frequency = 0.25 * sample_rate
 symbol_clock_offset = .1
 qpsk_constellation = [[complex(np.sqrt(1) + np.sqrt(1) * 1j), 3],
@@ -47,7 +47,7 @@ amplitude_to_bits = dict(zip(amplitudes, bits))
 bits_to_amplitude = dict(zip(bits, amplitudes))
 bits_to_bits_str = dict(zip(bits, bits_str))
 
-test_input_1 = [3, 3, 3, 3, 3, 3, 3]
+test_input_1 = [1, 1, 1]
 test_input_2 = [3, 2, 1, 0, 1, 2, 3]
 string_input = " \nthis is a symbol timing error syncronization test and was developed by William Powers\n "
 string_input_bin = ''.join(string_to_ascii_binary(string_input))
@@ -66,8 +66,8 @@ a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 
 # 1.2 INTRODUCE TIMING OFFSET
-a_k_upsampled_real = apply_clock_offset(a_k_upsampled_real, sample_rate, sample_rate, timing_offset)
-a_k_upsampled_imag = apply_clock_offset(a_k_upsampled_imag, sample_rate, sample_rate, timing_offset)
+a_k_upsampled_real = clock_offset(a_k_upsampled_real, sample_rate, sample_rate, timing_offset)
+a_k_upsampled_imag = clock_offset(a_k_upsampled_imag, sample_rate, sample_rate, timing_offset)
 
 # 1.3 PULSE SHAPE (TRANSMIT)
 length = 64
@@ -92,7 +92,7 @@ x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -
 x_nT = x_nT_real + 1j * x_nT_imag
 
 # 2.3 SYMBOL TIMING SYNCHRONIZATION
-loop_bandwidth = 0.02*sample_rate
+loop_bandwidth = 0.2*sample_rate
 damping_factor = 1/np.sqrt(2)
 scs = SCS.SCS(sample_rate, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, upsample_rate=10)
 
@@ -108,7 +108,7 @@ x_kTs = scs.get_scs_output_record()[len(header): -len(header)] # remove header
 timing_error_record = scs.get_timing_error_record()
 loop_filter_record = scs.get_loop_filter_record()
 
-DSP.plot_complex_points(x_kTs, referencePoints=amplitudes) # plotting received constellations
+DSP.plot_complex_points(x_kTs, referencePoints=amplitudes)
 
 plt.figure()
 plt.stem(timing_error_record, "ro", label="TED")
@@ -116,7 +116,6 @@ plt.stem(loop_filter_record, "bo", label="Loop Filter")
 plt.title("Synchronization Error Records")
 plt.legend()
 plt.show()
-
 
 # 2.4 MAKE A DECISION FOR EACH PULSE
 detected_ints = communications.nearest_neighbor(x_kTs, qpsk_constellation)

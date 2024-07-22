@@ -40,40 +40,32 @@ test_input_1 = [1, 0, 1, 0]
 
 
 # SYNCHRONIZATION PARAMETERS
-timing_offset = 0.10 # fractional offset (0-1)
+timing_offset = 0.5 # fractional offset (0-1)
 
 # UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
 b_k = test_input_1
 a_k = [bits_to_amplitude[bit] for bit in b_k]
 a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate_flag=False)
-a_k_upsampled_real = np.real(a_k_upsampled)
+
 a_k_upsampled_imag = np.imag(a_k_upsampled)
-
-# TIMING OFFSET
-a_k_upsampled_real_offset = apply_clock_offset(a_k_upsampled_real, sample_rate, timing_offset)
 a_k_upsampled_imag_offset = apply_clock_offset(a_k_upsampled_imag, sample_rate, timing_offset)
-
 
 # PULSE SHAPE
 length = 64
 alpha = 0.5
 pulse_shape = communications.srrc(alpha, sample_rate, length)
 
-s_nT_real = np.real(np.roll(DSP.convolve(a_k_upsampled_real, pulse_shape, mode="same"), -1))
 s_nT_imag = np.real(np.roll(DSP.convolve(a_k_upsampled_imag, pulse_shape, mode="same"), -1))
-
-s_nT_real_offset = np.real(np.roll(DSP.convolve(a_k_upsampled_real_offset, pulse_shape, mode="same"), -1))
 s_nT_imag_offset = np.real(np.roll(DSP.convolve(a_k_upsampled_imag_offset, pulse_shape, mode="same"), -1))
 
+# # PLOTTING
+# fig, axs = plt.subplots(2, 1, figsize=(10, 8))
 
-# PLOTTING
-fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+# axs[0].stem(s_nT_imag)
+# axs[0].set_title("Pulse Shaped")
 
-axs[0].stem(s_nT_imag)
-axs[0].set_title("Pulse Shaped")
+# axs[1].stem(s_nT_imag_offset)
+# axs[1].set_title("Pulse Shaped w/ Offset")
 
-axs[1].stem(s_nT_imag_offset)
-axs[1].set_title("Pulse Shaped w/ Offset")
-
-plt.tight_layout()
-plt.show()
+# plt.tight_layout()
+# plt.show()

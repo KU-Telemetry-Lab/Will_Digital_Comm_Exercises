@@ -66,12 +66,12 @@ phase_ambiguities = {
 }
 
 transmitter_phase_offset = np.pi
-transmitter_freq_offset =  0/sample_rate # (Hz)
+transmitter_freq_offset =  0.0005/sample_rate # (Hz)
 
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
 b_k = header + unique_word + test_input_3
 a_k = [bits_to_amplitude[bit] for bit in b_k]
-a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate=False)
+a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate_flag=False)
 a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 

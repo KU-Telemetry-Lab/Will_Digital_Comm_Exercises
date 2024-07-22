@@ -7,18 +7,21 @@ from KUSignalLib import DSP
 from KUSignalLib import MatLab
 from KUSignalLib import communications, SCS
 
+def early_late_ted(early_sample, on_time_sample, late_sample, sample_rate):
+    timing_error = on_time_sample * (late_sample - early_sample)
+    timing_error = timing_error * (1/sample_rate)
+    print(timing_error)
+    return timing_error
+
 
 # SYSTEM PARAMETERS
 sample_rate = 8
 carrier_frequency = 0.25*sample_rate
-carrier_phase = 0
-
-qpsk_constellation = [ # (need to change for sync data set)
-    [complex( np.sqrt(4.5)+ np.sqrt(4.5)*1j), 3], 
-    [complex( np.sqrt(4.5)+-np.sqrt(4.5)*1j), 2], 
-    [complex(-np.sqrt(4.5)+-np.sqrt(4.5)*1j), 0], 
-    [complex(-np.sqrt(4.5)+ np.sqrt(4.5)*1j), 1]
-]
+symbol_clock_offset = 0
+qpsk_constellation = [[complex( np.sqrt(4.5)+ np.sqrt(4.5)*1j), 3], 
+                      [complex( np.sqrt(4.5)+-np.sqrt(4.5)*1j), 2], 
+                      [complex(-np.sqrt(4.5)+-np.sqrt(4.5)*1j), 0], 
+                      [complex(-np.sqrt(4.5)+ np.sqrt(4.5)*1j), 1]]
 
 bits = [i[1] for i in qpsk_constellation]
 bits_str = ['11', '10', '00', '01']
@@ -30,7 +33,7 @@ bits_to_bits_str = dict(zip(bits, bits_str))
 
 # TEST SYSTEM ON GIVEN ASCII DATA
 test_file = "qpskdata.mat" # (need to figure out data set import)
-modulated_data = MatLab.load_matlab_file(test_file)[1]
+modulated_data = MatLab.load_matlab_file(test_file)[1][0:200]
 data_offset = 12
 pulse_shape = communications.srrc(.5, sample_rate, 32)
 
@@ -44,39 +47,12 @@ x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -
 x_nT = x_nT_real + 1j * x_nT_imag
 
 # SYMBOL TIMING SYNCHRONIZATION
-loop_bandwidth = 0.02 * sample_rate
-damping_factor = 1/np.sqrt(2)
-scs = SCS.SCS(sample_rate, mode="argmax", loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, upsample_rate=10)
 
-for i in range(len(x_nT)):
+for i in range(0, len(x_nT), sample_rate):
     if i == 0: # edge case (start)
-        scs.insert_new_sample(0, x_nT[i], x_nT[i+1])
+        early_late_ted(0, x_nT[i], x_nT[i+1], sample_rate)
     elif i == len(x_nT)-1: # edge case (end)
-        scs.insert_new_sample(x_nT[i-1], x_nT[i], 0)
+        early_late_ted(x_nT[i-1], x_nT[i], 0, sample_rate)
     else:
-        scs.insert_new_sample(x_nT[i-1], x_nT[i], x_nT[i+1])
+        early_late_ted(x_nT[i-1], x_nT[i], x_nT[i+1], sample_rate)
 
-x_kTs = scs.get_scs_output_record()
-timing_error_record = scs.get_timing_error_record()
-loop_filter_record = scs.get_loop_filter_record()
-
-# NORMALIZATION !?!?
-x_kTs = x_kTs / 7.542
-
-# PLOTTING
-# DSP.plot_complex_points(x_kTs, referencePoints=amplitudes) # plotting received constellations
-
-plt.figure()
-plt.plot(timing_error_record, label="TED", color="red")
-plt.plot(loop_filter_record, label="Loop Filter", color="blue")
-plt.title("Synchronization Error Records")
-plt.legend()
-plt.show()
-
-# # SYMBOL TO ASCII
-# detected_symbols = communications.nearest_neighbor(x_kTs, qpsk_constellation)
-# detected_bits = []
-# for symbol in detected_symbols:
-#     detected_bits += list(bits_to_bits_str[symbol])
-# message = communications.bin_to_char(detected_bits[data_offset:])
-# print(message)
