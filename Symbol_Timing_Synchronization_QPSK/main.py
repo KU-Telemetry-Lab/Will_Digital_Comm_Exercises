@@ -24,11 +24,11 @@ def error_count(x, y):
 
 def apply_clock_offset(signal, sample_rate, samples_per_symbol, offset_fraction):
     t = np.arange(0, len(signal) / sample_rate, 1 / sample_rate)
-    clock_offset = (samples_per_symbol + 1/sample_rate) * offset_fraction
+    clock_offset = (1/sample_rate) * offset_fraction
 
     interpolator = intp.interp1d(t, signal, kind='linear', fill_value='extrapolate')
-    t_shifted = t + clock_offset  # Shift the time vector
-    x_shifted = interpolator(t_shifted)  # Get the shifted signal
+    t_shifted = t + clock_offset 
+    x_shifted = interpolator(t_shifted)
     return x_shifted
 
 # SYSTEM PARAMETERS
@@ -56,7 +56,7 @@ test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 
 # SYNCHRONIZATION PARAMETERS
 header = (3 * np.ones(10, dtype=int)).tolist()
-timing_offset = 0.01 # fractional offset in symbols
+timing_offset = 0.5 # fractional offset in symbols
 
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
 b_k = header + test_input_2 + header
@@ -65,19 +65,9 @@ a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate_flag=False)
 a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 
-plt.figure()
-plt.stem(a_k_upsampled_imag)
-plt.title("Non Offset")
-
 # 1.2 INTRODUCE TIMING OFFSET
 a_k_upsampled_real = apply_clock_offset(a_k_upsampled_real, sample_rate, sample_rate, timing_offset)
 a_k_upsampled_imag = apply_clock_offset(a_k_upsampled_imag, sample_rate, sample_rate, timing_offset)
-
-plt.figure()
-plt.stem(a_k_upsampled_imag)
-plt.title("Offset")
-plt.show()
-
 
 # 1.3 PULSE SHAPE (TRANSMIT)
 length = 64
@@ -122,7 +112,7 @@ loop_filter_record = scs.get_loop_filter_record()
 detected_ints = communications.nearest_neighbor(x_kTs, qpsk_constellation)
 error_count = error_count(b_k[len(header):-len(header)], detected_ints)
 print(f"Transmission Symbol Errors: {error_count}")
-print(f"Bit Error Percentage: {round(error_count * 2 / len(detected_ints), 2)} %")
+print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_ints), 2)} %")
 
 # # 2.5 CONVERT BINARY TO ASCII
 # detected_bits = []
