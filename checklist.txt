@@ -8,5 +8,5 @@ Fully Completed Exercises and Implementations:
     - Carrier_Phase_Sync_QPSK
     - Symbol_Timing_Sync_QPSK
     - Full_System_QPSK
-    - CORDIC
+    - CORDIC (add QPSK with CORDIC example)
     - FFT ESTIMATOR

@@ -8,20 +8,28 @@ from KUSignalLib import MatLab as ml
 from KUSignalLib import DSP as dsp
 from KUSignalLib import PLL
  
-test = dsp.phase_difference([1+0j], [-1+0j])
 phaseShiftStart = 0.5*np.pi/2
 phaseShift = 0
 fs = 500
 w0 = 10
-w0_offset = 5*np.pi*2/fs
+w0_offset = 5
+
 incomingSignal = []
 internalSignal = []
 phaseTrack = []
 error = []
  
-pll = PLL.PLL(kp=0.02, k0=1, k1=1, k2=0.005, wstart=w0, fs=fs, thetaStart = 0)
+loop_bandwidth = 0.05 * fs
+damping_factor = 1/np.sqrt(2)
+pll = PLL.PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
+
+print(f"Kp: {pll.Kp}")
+print(f"K0: {pll.K0}")
+print(f"K1: {pll.K1}")
+print(f"K2: {pll.K2}")
+
 for n in range(1000):
-    incomingSignal.append(np.exp(1j*((np.pi*2*w0/fs+w0_offset)*n + phaseShiftStart)))
+    incomingSignal.append(np.exp(1j*((np.pi*2*(w0 + w0_offset)/fs)*n + phaseShiftStart)))
    
     internalSignal.append(pll.insert_new_sample(incomingSignal[n], n))
     error.append(pll.phase_detector(internalSignal[n], incomingSignal[n], Kp=1))
