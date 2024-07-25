@@ -39,7 +39,7 @@ phase_ambiguities = {
     "00003333": 3*np.pi/2
 }
 
-header = [3, 3, 3, 3]
+header = np.tile([3, 0], 50).tolist()
 
 bits = [i[1] for i in qpsk_constellation]
 bits_str = ['11', '10', '00', '01']
@@ -64,16 +64,12 @@ r_nT_imag = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(modulated_data, car
 # match filter
 x_nT = np.real(np.roll(DSP.convolve(r_nT_real, pulse_shape, mode="same"), -1)) + 1j * np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -1))
 
-# down sample (and remove header)
-x_kTs = (np.array(DSP.downsample(x_nT, sample_rate, offset=0)))[len(header):]
+# down sample
+x_kTs = (np.array(DSP.downsample(x_nT, sample_rate, offset=0)))
 
 B = 0.02 * sample_rate
 zeta = 1 / np.sqrt(2)
-K0 = 1
-Kp = 1
-K1 = ((4 * zeta) / (zeta + (1 / (4 * zeta)))) * ((B * (1 / sample_rate)) / K0)
-K2 = ((4) / (zeta + (1 / (4 * zeta))) ** 2) * (((B * (1 / sample_rate)) ** 2) / K0)
-pll = PLL.PLL(Kp, K0, K1, K2, carrier_frequency, sample_rate)
+pll = PLL.PLL(sample_rate, loop_bandwidth=B, damping_factor=zeta)
 
 dds_output = np.exp(1j * 0)
 rotated_constellations = []
@@ -100,25 +96,39 @@ for i in range(len(x_kTs)):
     # generate next dds output
     dds_output = np.exp(1j * loop_filter_output)
 
-# plt.plot(np.real(x_kTs), np.imag(x_kTs), 'ro')
+plt.plot(pll_error, label='Phase error')
+# plt.plot(np.real(internalSignal), label='internal Signal')
+# plt.plot(np.real(incomingSignal), label='incoming Signal')
+plt.legend()
+plt.show()
+
+# DSP.plot_complex_points(detected_constellations, referencePoints=amplitudes) 
+
+# detected_ints = communications.nearest_neighbor(detected_constellations, qpsk_constellation)
+
+# unique_word_found = None
+# unique_word_index = -1
+
+# for unique_word in phase_ambiguities.keys():
+#     unique_word_list = [int(i) for i in unique_word]
+#     unique_word_index = find_subarray_index(unique_word_list, detected_ints)
+#     if unique_word_index != -1:
+#         unique_word_found = unique_word
+#         break
+
+# detected_constellations = np.array(detected_constellations[unique_word_index:]) * np.exp(-1j * phase_ambiguities[unique_word_found])
+# detected_ints = communications.nearest_neighbor(detected_constellations[len(unique_word):], qpsk_constellation)
+# print(f"Transmission Symbol Errors: {error_count(b_k[len(header) + len(unique_word):], detected_ints)}")
+
+# # 4.2 CONSTELLATION PLOTTING
 # plt.plot(np.real(rotated_constellations), np.imag(rotated_constellations), 'ro')
 # plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo')
 # plt.show()
 
-# unique word resolution
-received_unique_word = communications.nearest_neighbor(detected_constellations[: len(unique_word_symbols)], qpsk_constellation)
-received_unique_word_string = ""
-for symbol in received_unique_word:
-    received_unique_word_string += str(symbol)
+# # 4.3 MESSAGE DECODING (BIN TO ASCII)
+# detected_bits = []
+# for symbol in detected_ints:
+#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
 
-print(received_unique_word_string)
-
-
-# uw_start_index = find_subarray_index(unique_word, detected_bits)
-# if uw_start_index == -1:
-#     uw_start_index = find_subarray_index(unique_word[::-1], detected_bits)
-    
-
-# # # detected_bits = detected_bits[uw_start_index + len(unique_word): uw_start_index + len(unique_word) + input_message_length]
-# # # message = communications.bin_to_char(detected_bits)
-# # # print(message)
+# message = communications.bin_to_char(detected_bits)
+# print(message)

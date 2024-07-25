@@ -4,7 +4,7 @@ Fully Completed Exercises and Implementations:
     - BPSK (DONE)
     - QPSK (DONE)
     - MPSK (TEST ERROR)
-    - PLL
+    - PLL (DONE)
     - Carrier_Phase_Sync_QPSK
     - Symbol_Timing_Sync_QPSK
     - Full_System_QPSK

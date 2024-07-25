@@ -30,8 +30,8 @@ print(f"K2: {pll.K2}")
 
 for n in range(1000):
     incomingSignal.append(np.exp(1j*((np.pi*2*(w0 + w0_offset)/fs)*n + phaseShiftStart)))
-   
     internalSignal.append(pll.insert_new_sample(incomingSignal[n], n))
+    
     error.append(pll.phase_detector(internalSignal[n], incomingSignal[n], Kp=1))
     phaseShift = pll.get_current_phase()
     phaseTrack.append(phaseShift)
