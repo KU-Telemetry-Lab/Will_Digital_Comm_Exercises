@@ -1,0 +1,12 @@
+Fully Completed Exercises and Implementations:
+    - Binary_PAM (DONE)
+    - Mary_PAM (TEST ERROR)
+    - BPSK (DONE)
+    - QPSK (DONE)
+    - MPSK (TEST ERROR)
+    - PLL
+    - Carrier_Phase_Sync_QPSK
+    - Symbol_Timing_Sync_QPSK
+    - Full_System_QPSK
+    - CORDIC
+    - FFT ESTIMATOR

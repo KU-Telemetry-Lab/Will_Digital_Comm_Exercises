@@ -49,9 +49,9 @@ test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 
 
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
-b_k = header + test_input_1
+b_k = header + test_input_3
 a_k = [bits_to_amplitude[bit] for bit in b_k]
-a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate=False)
+a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate_flag=False)
 a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 
@@ -80,6 +80,8 @@ x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -
 x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate))
 x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate))
 x_kTs = x_kTs_real + 1j * x_kTs_imag
+
+DSP.plot_complex_points(x_kTs, referencePoints=amplitudes) # plotting received constellations
 
 # 2.4 MAKE A DECISION FOR EACH PULSE
 detected_ints = communications.nearest_neighbor(x_kTs[len(header):], qpsk_constellation)

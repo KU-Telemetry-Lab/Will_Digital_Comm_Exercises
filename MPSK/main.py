@@ -58,7 +58,7 @@ test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
 b_k = header + test_input_3
 a_k = [bits_to_amplitude[bit] for bit in b_k]
-a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate=False)
+a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate_flag=False)
 a_k_upsampled_real = np.real(a_k_upsampled)
 a_k_upsampled_imag = np.imag(a_k_upsampled)
 
@@ -74,6 +74,7 @@ s_nT_modulated = (
     np.array(np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_real, carrier_frequency, sample_rate))) +
     np.array(np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_nT_imag, carrier_frequency, sample_rate)))
 )
+
 
 # 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
 r_nT_real = np.array(np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_modulated, carrier_frequency, sample_rate)))

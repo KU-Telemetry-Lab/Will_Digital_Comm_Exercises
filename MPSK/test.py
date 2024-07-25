@@ -50,8 +50,10 @@ x_kTs = x_kTs_real + 1j * x_kTs_imag
 # DSP.plot_complex_points(x_kTs, referencePoints=amplitudes) # plotting received constellations
 
 detected_symbols = communications.nearest_neighbor(x_kTs, mpsk_constellation)[data_offset:]
+
 detected_bits = []
 for symbol in detected_symbols:
     detected_bits += list(bits_to_bits_str[symbol])
+
 message = communications.bin_to_char(detected_bits)
 print(message)

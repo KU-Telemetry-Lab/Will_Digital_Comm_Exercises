@@ -5,7 +5,8 @@ import sys
 sys.path.insert(0, '../KUSignalLib/src')
 from KUSignalLib import DSP
 from KUSignalLib import MatLab
-from KUSignalLib import communications as Communications
+from KUSignalLib import communications
+
 
 def int_to_three_bit_binary(num):
     binary_str = bin(num)[2:]  # Convert integer to binary string
@@ -20,16 +21,18 @@ def string_to_ascii_binary(string, num_bits=7):
     return ascii_binary_strings
 
 
+# SYSTEM PARAMETERS
 sample_rate = 16 # samples/bit
-pulse_shape = "NRZ" # non return to zero pulse shaping
+pulse_shape = "NRZ"
 symbol_clock_offset = 0
 
 amplitudes = [-7, -5, -3, -1, 1, 3, 5, 7]
 bits = [0, 1, 3, 2, 5, 7, 6, 4]
-bin_strs = ['000', '001', '011', '010', '101', '111', '110', '100']
+bits_str = ['000', '001', '011', '010', '101', '111', '110', '100']
 amplitude_to_bits = dict(zip(amplitudes, bits))
 bits_to_amplitude = dict(zip(bits, amplitudes))
-bits_to_bin_str = dict(zip(bits, bin_strs))
+bits_to_bits_str = dict(zip(bits, bits_str))
+
 mary_pam = [
     [complex(-7+0j), 0], 
     [complex(-5+0j), 1], 
@@ -42,17 +45,20 @@ mary_pam = [
 
 # TEST SYSTEM ON GIVEN ASCII DATA
 test_file = "bb8data.mat"
-input_message_length = 140 # symbols = 420 bits = 60 ascii chars
-r_nT = MatLab.loadMatLabFile(test_file)[1]
+input_message_length = 140
+r_nT = MatLab.load_matlab_file(test_file)[1]
 
-filter_num = [.25/3 for i in range(sample_rate)]
+filter_num = [1/3 for i in range(sample_rate)]
 filter_denom = [1]
 padding_length = max(len(filter_num), len(filter_denom))
-x_nT = DSP.DirectForm2(np.array(filter_num), np.array(filter_denom), r_nT)
 
-x_kTs = DSP.Downsample(x_nT[sample_rate:], sample_rate)
+x_nT = DSP.direct_form_2(np.array(filter_num), np.array(filter_denom), r_nT)
+x_kTs = DSP.downsample(x_nT[sample_rate:], sample_rate)
+detected_ints = communications.nearest_neighbor(x_kTs, mary_pam)
 
-detected_ints = Communications.nearest_neighbor(x_kTs, mary_pam)
+detected_bits = []
+for symbol in detected_ints:
+    detected_bits += list(bits_to_bits_str[symbol])
 
-char_message = Communications.bin_to_ascii(detected_bits)
+char_message = communications.bin_to_char(detected_bits)
 print(char_message)
