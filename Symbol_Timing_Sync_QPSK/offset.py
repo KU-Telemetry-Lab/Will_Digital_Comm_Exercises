@@ -58,14 +58,14 @@ pulse_shape = communications.srrc(alpha, sample_rate, length)
 s_nT_imag = np.real(np.roll(DSP.convolve(a_k_upsampled_imag, pulse_shape, mode="same"), -1))
 s_nT_imag_offset = np.real(np.roll(DSP.convolve(a_k_upsampled_imag_offset, pulse_shape, mode="same"), -1))
 
-# # PLOTTING
-# fig, axs = plt.subplots(2, 1, figsize=(10, 8))
+# PLOTTING
+fig, axs = plt.subplots(2, 1, figsize=(10, 8))
 
-# axs[0].stem(s_nT_imag)
-# axs[0].set_title("Pulse Shaped")
+axs[0].stem(s_nT_imag)
+axs[0].set_title("Pulse Shaped")
 
-# axs[1].stem(s_nT_imag_offset)
-# axs[1].set_title("Pulse Shaped w/ Offset")
+axs[1].stem(s_nT_imag_offset)
+axs[1].set_title("Pulse Shaped w/ Offset")
 
-# plt.tight_layout()
-# plt.show()
+plt.tight_layout()
+plt.show()

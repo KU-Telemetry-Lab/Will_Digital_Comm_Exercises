@@ -7,13 +7,6 @@ from KUSignalLib import DSP
 from KUSignalLib import MatLab
 from KUSignalLib import communications, SCS
 
-def early_late_ted(early_sample, on_time_sample, late_sample, sample_rate):
-    timing_error = on_time_sample * (late_sample - early_sample)
-    timing_error = timing_error * (1/sample_rate)
-    print(timing_error)
-    return timing_error
-
-
 # SYSTEM PARAMETERS
 sample_rate = 8
 carrier_frequency = 0.25*sample_rate
@@ -33,7 +26,7 @@ bits_to_bits_str = dict(zip(bits, bits_str))
 
 # TEST SYSTEM ON GIVEN ASCII DATA
 test_file = "qpskdata.mat" # (need to figure out data set import)
-modulated_data = MatLab.load_matlab_file(test_file)[1][0:200]
+modulated_data = MatLab.load_matlab_file(test_file)[1]
 data_offset = 12
 pulse_shape = communications.srrc(.5, sample_rate, 32)
 
@@ -47,12 +40,27 @@ x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -
 x_nT = x_nT_real + 1j * x_nT_imag
 
 # SYMBOL TIMING SYNCHRONIZATION
+loop_bandwidth = 0.2*sample_rate
+damping_factor = 1/np.sqrt(2)
+scs = SCS.SCS(sample_rate, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, upsample_rate=10)
 
-for i in range(0, len(x_nT), sample_rate):
+for i in range(len(x_nT)):
     if i == 0: # edge case (start)
-        early_late_ted(0, x_nT[i], x_nT[i+1], sample_rate)
+        scs.insert_new_sample(0, x_nT[i], x_nT[i+1])
     elif i == len(x_nT)-1: # edge case (end)
-        early_late_ted(x_nT[i-1], x_nT[i], 0, sample_rate)
+        scs.insert_new_sample(x_nT[i-1], x_nT[i], 0)
     else:
-        early_late_ted(x_nT[i-1], x_nT[i], x_nT[i+1], sample_rate)
+        scs.insert_new_sample(x_nT[i-1], x_nT[i], x_nT[i+1])
 
+x_kTs = scs.get_scs_output_record()
+timing_error_record = scs.get_timing_error_record()
+loop_filter_record = scs.get_loop_filter_record()
+
+DSP.plot_complex_points(x_kTs, referencePoints=amplitudes)
+
+plt.figure()
+plt.stem(timing_error_record, "ro", label="TED")
+plt.stem(loop_filter_record, "bo", label="Loop Filter")
+plt.title("Synchronization Error Records")
+plt.legend()
+plt.show()
