@@ -9,62 +9,61 @@ from KUSignalLib import DSP
 from KUSignalLib import communications, SCS
 
 
-def apply_clock_offset(signal, sample_rate, offset_fraction):
+def clock_offset(signal, sample_rate, offset_fraction):
     t = np.arange(0, len(signal) / sample_rate, 1 / sample_rate)
     clock_offset = (1/sample_rate) * offset_fraction
-    print(1/sample_rate)
-    print(clock_offset)
-
     interpolator = intp.interp1d(t, signal, kind='linear', fill_value='extrapolate')
-    t_shifted = t + clock_offset
+    t_shifted = t + clock_offset 
     x_shifted = interpolator(t_shifted)
     return x_shifted
 
-
 # SYSTEM PARAMETERS
-sample_rate = 8
-carrier_frequency = 0.25 * sample_rate
-symbol_clock_offset = .1
-qpsk_constellation = [[complex(np.sqrt(1) + np.sqrt(1) * 1j), 3],
-                      [complex(np.sqrt(1) + -np.sqrt(1) * 1j), 2],
-                      [complex(-np.sqrt(1) + -np.sqrt(1) * 1j), 0],
-                      [complex(-np.sqrt(1) + np.sqrt(1) * 1j), 1]]
+###################################################################################################
+qpsk_constellation = [[complex( np.sqrt(1) +  np.sqrt(1)*1j), 3], 
+                      [complex( np.sqrt(1) + -np.sqrt(1)*1j), 2], 
+                      [complex(-np.sqrt(1) + -np.sqrt(1)*1j), 0], 
+                      [complex(-np.sqrt(1) +  np.sqrt(1)*1j), 1]]
+fs = 8 # sample rate
+input_message_symbols = [1, 0, 1, 0]
 
-bits = [i[1] for i in qpsk_constellation]
-bits_str = ['11', '10', '00', '01']
+bits_to_amplitude = {bit: amplitude for amplitude, bit in qpsk_constellation}
+
+# inphase channel symbol mapping
+xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
+
+# quadrature channel symbol mapping
+yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
+
+
+# UPSAMPLING
+# ###################################################################################################
+xk_upsampled = DSP.upsample(xk, fs, interpolate_flag=False)
+yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
+
+
+# INTRODUCE TIMING OFFSET (NEEDS WORK)
+###################################################################################################
+timing_offset = 0.0
+xk_upsampled_offset = clock_offset(xk_upsampled, fs, timing_offset)
+yk_upsampled_offset = clock_offset(yk_upsampled, fs, timing_offset)
+
 amplitudes = [i[0] for i in qpsk_constellation]
-amplitude_to_bits = dict(zip(amplitudes, bits))
-bits_to_amplitude = dict(zip(bits, amplitudes))
-bits_to_bits_str = dict(zip(bits, bits_str))
-test_input_1 = [1, 0, 1, 0]
+DSP.plot_complex_points((xk_upsampled_offset + 1j*yk_upsampled_offset), referencePoints=amplitudes)
 
-
-# SYNCHRONIZATION PARAMETERS
-timing_offset = 0.5 # fractional offset (0-1)
-
-# UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
-b_k = test_input_1
-a_k = [bits_to_amplitude[bit] for bit in b_k]
-a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate_flag=False)
-
-a_k_upsampled_imag = np.imag(a_k_upsampled)
-a_k_upsampled_imag_offset = apply_clock_offset(a_k_upsampled_imag, sample_rate, timing_offset)
 
 # PULSE SHAPE
+###################################################################################################
 length = 64
-alpha = 0.5
-pulse_shape = communications.srrc(alpha, sample_rate, length)
+alpha = 0.10
+pulse_shape = communications.srrc(alpha, fs, length)
 
-s_nT_imag = np.real(np.roll(DSP.convolve(a_k_upsampled_imag, pulse_shape, mode="same"), -1))
-s_nT_imag_offset = np.real(np.roll(DSP.convolve(a_k_upsampled_imag_offset, pulse_shape, mode="same"), -1))
+yk_pulse_shaped = np.real(DSP.convolve(yk_upsampled, pulse_shape, mode="same"))
+yk_pulse_shaped_offset = np.real(DSP.convolve(yk_upsampled_offset, pulse_shape, mode="same"))
 
-# PLOTTING
 fig, axs = plt.subplots(2, 1, figsize=(10, 8))
-
-axs[0].stem(s_nT_imag)
+axs[0].stem(yk_pulse_shaped)
 axs[0].set_title("Pulse Shaped")
-
-axs[1].stem(s_nT_imag_offset)
+axs[1].stem(yk_pulse_shaped_offset)
 axs[1].set_title("Pulse Shaped w/ Offset")
 
 plt.tight_layout()

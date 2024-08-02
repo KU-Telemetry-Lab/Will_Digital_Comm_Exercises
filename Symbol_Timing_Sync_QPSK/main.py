@@ -21,7 +21,6 @@ def error_count(x, y):
 def clock_offset(signal, sample_rate, offset_fraction):
     t = np.arange(0, len(signal) / sample_rate, 1 / sample_rate)
     clock_offset = (1/sample_rate) * offset_fraction
-
     interpolator = intp.interp1d(t, signal, kind='linear', fill_value='extrapolate')
     t_shifted = t + clock_offset 
     x_shifted = interpolator(t_shifted)
@@ -98,14 +97,14 @@ amplitudes = [i[0] for i in qpsk_constellation]
 # DSP.plot_complex_points((xk_upsampled + 1j*yk_upsampled), referencePoints=amplitudes)
 
 
-# PULSE SHAPE (TRANSMIT)
+# PULSE SHAPE
 ###################################################################################################
 length = 64
 alpha = 0.10
 pulse_shape = communications.srrc(alpha, fs, length)
 
-xk_pulse_shaped = np.real(np.roll(DSP.convolve(xk_upsampled, pulse_shape, mode="same"), -1))
-yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="same"), -1))
+xk_pulse_shaped = np.real(DSP.convolve(xk_upsampled, pulse_shape, mode="same"))
+yk_pulse_shaped = np.real(DSP.convolve(yk_upsampled, pulse_shape, mode="same"))
 
 # # plot pulse shaped signal
 # plt.figure()
