@@ -47,13 +47,11 @@ string_input_bin = ''.join(string_to_ascii_binary(string_input))
 input_bin_blocks = [string_input_bin[i:i+2] for i in range(0, len(string_input_bin), 2)]
 test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
 
-
 # 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
-b_k = header + test_input_1
+b_k = test_input_3
 a_k = [bits_to_amplitude[bit] for bit in b_k]
-a_k_upsampled = DSP.upsample(a_k, sample_rate, interpolate_flag=False)
-a_k_upsampled_real = np.real(a_k_upsampled)
-a_k_upsampled_imag = np.imag(a_k_upsampled)
+a_k_upsampled_real = DSP.upsample(np.real(a_k), sample_rate, interpolate_flag=False)
+a_k_upsampled_imag = DSP.upsample(np.imag(a_k), sample_rate, interpolate_flag=False)
 
 # DSP.plot_complex_points(a_k_upsampled[len(header)*sample_rate:], referencePoints=amplitudes) # plotting received constellations
 
@@ -97,55 +95,55 @@ for symbol in detected_ints:
 message = communications.bin_to_char(detected_bits)
 print(message)
 
-# Plot original symbols
-plt.figure()
-plt.stem(np.imag(a_k[len(header):]))
-plt.title("Original Symbols")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
+# # # Plot original symbols
+# # plt.figure()
+# # plt.stem(np.imag(a_k[len(header):]))
+# # plt.title("Original Symbols")
+# # plt.xlabel("Sample Time [n]")
+# # plt.ylabel("Amplutide [V]")
 
-# Plot upsampled symbols
-plt.figure()
-plt.stem(np.imag(a_k_upsampled[len(header)*sample_rate:]))
-plt.title("Upsampled Symbols")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
+# # # Plot upsampled symbols
+# # plt.figure()
+# # plt.stem(np.imag(a_k_upsampled[len(header)*sample_rate:]))
+# # plt.title("Upsampled Symbols")
+# # plt.xlabel("Sample Time [n]")
+# # plt.ylabel("Amplutide [V]")
 
-# Plot match filtered signal
-plt.figure()
-plt.stem(s_nT_imag[len(header)*sample_rate:])
-plt.title("Pulse Shaped Signal")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
+# # # Plot match filtered signal
+# # plt.figure()
+# # plt.stem(s_nT_imag[len(header)*sample_rate:])
+# # plt.title("Pulse Shaped Signal")
+# # plt.xlabel("Sample Time [n]")
+# # plt.ylabel("Amplutide [V]")
 
-# Plot modulated signal
-plt.figure()
-plt.stem(s_nT_modulated[len(header)*sample_rate:])
-plt.title("Modulated Signal")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
+# # # Plot modulated signal
+# # plt.figure()
+# # plt.stem(s_nT_modulated[len(header)*sample_rate:])
+# # plt.title("Modulated Signal")
+# # plt.xlabel("Sample Time [n]")
+# # plt.ylabel("Amplutide [V]")
 
-# Plot demodulated signal
-plt.figure()
-plt.stem(r_nT_imag[len(header)*sample_rate:])
-plt.title("Demodulated Signal")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
+# # # Plot demodulated signal
+# # plt.figure()
+# # plt.stem(r_nT_imag[len(header)*sample_rate:])
+# # plt.title("Demodulated Signal")
+# # plt.xlabel("Sample Time [n]")
+# # plt.ylabel("Amplutide [V]")
 
-# Plot match filtered signal
-plt.figure()
-plt.stem(x_nT_imag[len(header)*sample_rate:])
-plt.title("Match Filtered Signal")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
+# # # Plot match filtered signal
+# # plt.figure()
+# # plt.stem(x_nT_imag[len(header)*sample_rate:])
+# # plt.title("Match Filtered Signal")
+# # plt.xlabel("Sample Time [n]")
+# # plt.ylabel("Amplutide [V]")
 
-# Plot downsampled signal
-plt.figure()
-plt.stem(np.imag(x_kTs[len(header):]))
-plt.title("Downsampled Signal")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
+# # # Plot downsampled signal
+# # plt.figure()
+# # plt.stem(np.imag(x_kTs[len(header):]))
+# # plt.title("Downsampled Signal")
+# # plt.xlabel("Sample Time [n]")
+# # plt.ylabel("Amplutide [V]")
 
-plt.show()
+# # plt.show()
 
 

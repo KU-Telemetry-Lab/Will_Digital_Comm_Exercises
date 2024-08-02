@@ -85,8 +85,8 @@ plt.xlabel('Symbol Index')
 plt.ylabel('Amplitude')
 plt.tight_layout()
 
-length_values = [17, 35, 65]
-alpha_values = [.01, .25, .75]
+length_values = [5]
+alpha_values = [.25]
 
 figures = []
 

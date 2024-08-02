@@ -78,7 +78,7 @@ phase_ambiguities = {
 }
 
 transmitter_phase_offset = np.pi
-transmitter_freq_offset =  0.0005/sample_rate # (Hz)
+transmitter_freq_offset =  0.0/sample_rate # (Hz)
 
 timing_offset = 0.5 # fraction of sample time
 
