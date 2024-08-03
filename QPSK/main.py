@@ -12,11 +12,7 @@ def string_to_ascii_binary(string, num_bits=7):
     return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
 
 def error_count(x, y):
-    count = 0
-    for i in range(len(x)):
-        if (x[i] != y[i]):
-            count += 1
-    return count
+    return sum(1 for i in range(len(x)) if x[i] != y[i])
 
 
 # SYSTEM PARAMETERS
@@ -45,6 +41,11 @@ xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
 # quadrature channel symbol mapping
 yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
+
+# adding header to each channel
+header = np.ones(25)
+xk = np.concatenate([header, xk])
+yk = np.concatenate([header, yk])
 
 # # plot original symbols
 # plt.figure()
@@ -80,8 +81,8 @@ length = 64
 alpha = 0.10
 pulse_shape = communications.srrc(alpha, fs, length)
 
-xk_pulse_shaped = np.real(DSP.convolve(xk_upsampled, pulse_shape, mode="same"))
-yk_pulse_shaped = np.real(DSP.convolve(yk_upsampled, pulse_shape, mode="same"))
+xk_pulse_shaped = np.real(np.roll(DSP.convolve(xk_upsampled, pulse_shape, mode="same"), -1))
+yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="same"), -1))
 
 # # plot pulse shaped signal
 # plt.figure()
@@ -117,13 +118,13 @@ s_RF = (
 xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_RF, fc, fs))
 yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
 
-# plot demodulated signal
-plt.figure()
-plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
-plt.title("Demodulated Signal")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
-plt.show()
+# # plot demodulated signal
+# plt.figure()
+# plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Demodulated Signal")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+# plt.show()
 
 
 # MATCH FILTER
@@ -142,11 +143,11 @@ yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="sa
 
 # DOWNSAMPLE EACH PULSE
 ##################################################################################################
-xk = DSP.downsample(xr_nT_match_filtered, fs)
-yk= DSP.downsample(yr_nT_match_filtered, fs)
+xk = DSP.downsample(xr_nT_match_filtered, fs)[len(header):] # removing header
+yk= DSP.downsample(yr_nT_match_filtered, fs)[len(header):] # removing header
 rk = xk + 1j * yk
 
-# DSP.plot_complex_points(x_kTs[len(header)*sample_rate:], referencePoints=amplitudes) # plotting received constellations
+communications.plot_complex_points(rk, constellation=qpsk_constellation)
 
 
 # MAKE A DECISION FOR EACH PULSE

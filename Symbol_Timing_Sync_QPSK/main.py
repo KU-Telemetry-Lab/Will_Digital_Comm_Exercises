@@ -12,11 +12,7 @@ def string_to_ascii_binary(string, num_bits=7):
     return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
 
 def error_count(x, y):
-    count = 0
-    for i in range(len(x)):
-        if (x[i] != y[i]):
-            count += 1
-    return count
+    return sum(1 for i in range(len(x)) if x[i] != y[i])
 
 def clock_offset(signal, sample_rate, offset_fraction):
     t = np.arange(0, len(signal) / sample_rate, 1 / sample_rate)
@@ -140,19 +136,19 @@ s_RF = (
 xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_RF, fc, fs))
 yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
 
-# plot demodulated signal
-plt.figure()
-plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
-plt.title("Demodulated Signal")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
-plt.show()
+# # plot demodulated signal
+# plt.figure()
+# plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Demodulated Signal")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+# plt.show()
 
 
 # MATCH FILTER
 ##################################################################################################
-xr_nT_match_filtered = np.real(np.roll(DSP.convolve(xr_nT, pulse_shape, mode="same"), -1))
-yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="same"), -1))
+xr_nT_match_filtered = np.real(DSP.convolve(xr_nT, pulse_shape, mode="same"))
+yr_nT_match_filtered = np.real(DSP.convolve(yr_nT, pulse_shape, mode="same"))
 r_nT = xr_nT_match_filtered + 1j * yr_nT_match_filtered
 
 # # plot match filtered signal
