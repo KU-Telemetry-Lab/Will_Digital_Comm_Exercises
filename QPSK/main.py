@@ -9,11 +9,7 @@ from KUSignalLib import communications
 
 
 def string_to_ascii_binary(string, num_bits=7):
-    ascii_binary_strings = []
-    for char in string:
-        ascii_binary = bin(ord(char))[2:].zfill(num_bits)
-        ascii_binary_strings.append(ascii_binary)
-    return ascii_binary_strings
+    return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
 
 def error_count(x, y):
     count = 0
@@ -22,128 +18,148 @@ def error_count(x, y):
             count += 1
     return count
 
+
 # SYSTEM PARAMETERS
-sample_rate = 8
-carrier_frequency = 0.25*sample_rate
-symbol_clock_offset = 0
+###################################################################################################
 qpsk_constellation = [[complex( np.sqrt(1) +  np.sqrt(1)*1j), 3], 
                       [complex( np.sqrt(1) + -np.sqrt(1)*1j), 2], 
                       [complex(-np.sqrt(1) + -np.sqrt(1)*1j), 0], 
                       [complex(-np.sqrt(1) +  np.sqrt(1)*1j), 1]]
+fs = 8 # sample rate
+fc = .25 * fs # carrier frequency
+input_message_ascii = "this is a qpsk transceiver test!"
 
-bits = [i[1] for i in qpsk_constellation]
-bits_str = ['11', '10', '00', '01']
-amplitudes = [i[0] for i in qpsk_constellation]
-amplitude_to_bits = dict(zip(amplitudes, bits))
-bits_to_amplitude = dict(zip(bits, amplitudes))
-bits_to_bits_str = dict(zip(bits, bits_str))
+# mapping the ascii characters to binary
+input_message_bins = ''.join(string_to_ascii_binary(input_message_ascii))
 
-header = [1, 1, 1, 1]
+# grouping the binary into blocks of two bits
+input_message_blocks = [input_message_bins[i:i+2] for i in range(0, len(input_message_bins), 2)]
 
-test_input_1 = [1, 0, 1, 0]
-test_input_2 = [3, 2, 1, 0, 1, 2, 3]
-string_input = "will is cool, this is a test"
-string_input_bin = ''.join(string_to_ascii_binary(string_input))
-input_bin_blocks = [string_input_bin[i:i+2] for i in range(0, len(string_input_bin), 2)]
-test_input_3 = [int(bin2, 2) for bin2 in input_bin_blocks]
+# mapping each block to a symbol in the constellation
+input_message_symbols = [int(bin2, 2) for bin2 in input_message_blocks]
 
-# 1.1 UPSAMPLE THE BASEBAND DISCRETE SYMBOLS
-b_k = test_input_3
-a_k = [bits_to_amplitude[bit] for bit in b_k]
-a_k_upsampled_real = DSP.upsample(np.real(a_k), sample_rate, interpolate_flag=False)
-a_k_upsampled_imag = DSP.upsample(np.imag(a_k), sample_rate, interpolate_flag=False)
+bits_to_amplitude = {bit: amplitude for amplitude, bit in qpsk_constellation}
 
-# DSP.plot_complex_points(a_k_upsampled[len(header)*sample_rate:], referencePoints=amplitudes) # plotting received constellations
+# inphase channel symbol mapping
+xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
-# 1.2 PULSE SHAPE THE UPSAMPLED SIGNAL (SRRC)
+# quadrature channel symbol mapping
+yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
+
+# # plot original symbols
+# plt.figure()
+# plt.stem(yk[len(header):len(header)+5])
+# plt.title("Symbols [0:5]")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplitude [V]")
+
+# print(f"\nHeader Length: {len(header)} symbols")
+# print(f"Message Length: {len(xk)} symbols")
+# print(f"Sample Rate: {fs} samples per symbol")
+# print(f"Carrier Frequency: {fc} Hz\n")
+# plt.show()
+
+
+# UPSAMPLING
+# ###################################################################################################
+xk_upsampled = DSP.upsample(xk, fs, interpolate_flag=False)
+yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
+
+# # plot upsampled symbols
+# plt.figure()
+# plt.stem(yk_upsampled[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Upsampled Symbols")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+# plt.show()
+
+
+# PULSE SHAPE
+###################################################################################################
 length = 64
-alpha = 0.5
-pulse_shape = communications.srrc(.5, sample_rate, length)
-s_nT_real = np.real(np.roll(DSP.convolve(a_k_upsampled_real, pulse_shape, mode="same"), -1))
-s_nT_imag = np.real(np.roll(DSP.convolve(a_k_upsampled_imag, pulse_shape, mode="same"), -1))
+alpha = 0.10
+pulse_shape = communications.srrc(alpha, fs, length)
 
-# 1.3 MODULATE ONTO CARRIER USING LOCAL OSCILLATOR
-s_nT_modulated = (
-    np.array(np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_real, carrier_frequency, sample_rate))) +
-    np.array(np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_nT_imag, carrier_frequency, sample_rate)))
+xk_pulse_shaped = np.real(DSP.convolve(xk_upsampled, pulse_shape, mode="same"))
+yk_pulse_shaped = np.real(DSP.convolve(yk_upsampled, pulse_shape, mode="same"))
+
+# # plot pulse shaped signal
+# plt.figure()
+# plt.stem(yk_pulse_shaped[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Pulse Shaped Signal")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+
+# print(f"\nFilter Length: {length} samples")
+# print(f"Message Length: {alpha} percent")
+# print(f"Sample Rate: {fs} samples per symbol\n")
+# plt.show()
+
+
+# DIGITAL MODULATION
+##################################################################################################
+s_RF = (
+    np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc, fs)) +
+    np.sqrt(2) * np.imag(DSP.modulate_by_exponential(yk_pulse_shaped, fc, fs))
 )
 
-# 2.1 DEMODULATE THE RECEIVED SIGNAL USING LOCAL OSCILLATOR
-r_nT_real = np.array(np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_nT_modulated, carrier_frequency, sample_rate)))
-r_nT_imag = np.array(np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_nT_modulated, carrier_frequency, sample_rate)))
+# # plot modulated RF signal
+# plt.figure()
+# plt.stem(s_RF[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Modulated Signal")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+# plt.show()
 
-# 2.2 MATCH FILTER THE RECEIVED SIGNAL
-x_nT_real = np.real(np.roll(DSP.convolve(r_nT_real, pulse_shape, mode="same"), -1))
-x_nT_imag = np.real(np.roll(DSP.convolve(r_nT_imag, pulse_shape, mode="same"), -1))
 
-# 2.3 DOWNSAMPLE EACH PULSE
-x_kTs_real = np.array(DSP.downsample(x_nT_real, sample_rate))
-x_kTs_imag = np.array(DSP.downsample(x_nT_imag, sample_rate))
-x_kTs = x_kTs_real + 1j * x_kTs_imag
+# DIGITAL DEMODULATIOIN
+##################################################################################################
+xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_RF, fc, fs))
+yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
+
+# plot demodulated signal
+plt.figure()
+plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
+plt.title("Demodulated Signal")
+plt.xlabel("Sample Time [n]")
+plt.ylabel("Amplutide [V]")
+plt.show()
+
+
+# MATCH FILTER
+##################################################################################################
+xr_nT_match_filtered = np.real(np.roll(DSP.convolve(xr_nT, pulse_shape, mode="same"), -1))
+yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="same"), -1))
+
+# # plot match filtered signal
+# plt.figure()
+# plt.stem(yr_nT_match_filtered[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Match Filtered Signal")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+# plt.show()
+
+
+# DOWNSAMPLE EACH PULSE
+##################################################################################################
+xk = DSP.downsample(xr_nT_match_filtered, fs)
+yk= DSP.downsample(yr_nT_match_filtered, fs)
+rk = xk + 1j * yk
 
 # DSP.plot_complex_points(x_kTs[len(header)*sample_rate:], referencePoints=amplitudes) # plotting received constellations
 
-# 2.4 MAKE A DECISION FOR EACH PULSE
-detected_ints = communications.nearest_neighbor(x_kTs[len(header):], qpsk_constellation)
-print(f"Transmission Symbol Errors: {error_count(b_k[len(header):], detected_ints)}")
 
-# 2.5 CONVERT BINARY TO ASCII
+# MAKE A DECISION FOR EACH PULSE
+##################################################################################################
+detected_symbols = communications.nearest_neighbor(rk, qpsk_constellation)
+error_count = error_count(input_message_symbols, detected_symbols)
+print(f"Transmission Symbol Errors: {error_count}")
+print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
+
+# converting symbols to binary then binary to ascii
 detected_bits = []
-for symbol in detected_ints:
+for symbol in detected_symbols:
     detected_bits += ([*bin(symbol)[2:].zfill(2)])
 
 message = communications.bin_to_char(detected_bits)
 print(message)
-
-# # # Plot original symbols
-# # plt.figure()
-# # plt.stem(np.imag(a_k[len(header):]))
-# # plt.title("Original Symbols")
-# # plt.xlabel("Sample Time [n]")
-# # plt.ylabel("Amplutide [V]")
-
-# # # Plot upsampled symbols
-# # plt.figure()
-# # plt.stem(np.imag(a_k_upsampled[len(header)*sample_rate:]))
-# # plt.title("Upsampled Symbols")
-# # plt.xlabel("Sample Time [n]")
-# # plt.ylabel("Amplutide [V]")
-
-# # # Plot match filtered signal
-# # plt.figure()
-# # plt.stem(s_nT_imag[len(header)*sample_rate:])
-# # plt.title("Pulse Shaped Signal")
-# # plt.xlabel("Sample Time [n]")
-# # plt.ylabel("Amplutide [V]")
-
-# # # Plot modulated signal
-# # plt.figure()
-# # plt.stem(s_nT_modulated[len(header)*sample_rate:])
-# # plt.title("Modulated Signal")
-# # plt.xlabel("Sample Time [n]")
-# # plt.ylabel("Amplutide [V]")
-
-# # # Plot demodulated signal
-# # plt.figure()
-# # plt.stem(r_nT_imag[len(header)*sample_rate:])
-# # plt.title("Demodulated Signal")
-# # plt.xlabel("Sample Time [n]")
-# # plt.ylabel("Amplutide [V]")
-
-# # # Plot match filtered signal
-# # plt.figure()
-# # plt.stem(x_nT_imag[len(header)*sample_rate:])
-# # plt.title("Match Filtered Signal")
-# # plt.xlabel("Sample Time [n]")
-# # plt.ylabel("Amplutide [V]")
-
-# # # Plot downsampled signal
-# # plt.figure()
-# # plt.stem(np.imag(x_kTs[len(header):]))
-# # plt.title("Downsampled Signal")
-# # plt.xlabel("Sample Time [n]")
-# # plt.ylabel("Amplutide [V]")
-
-# # plt.show()
-
-

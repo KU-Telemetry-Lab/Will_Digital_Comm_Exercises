@@ -140,13 +140,13 @@ s_RF = (
 xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_RF, fc, fs))
 yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
 
-# # plot demodulated signal
-# plt.figure()
-# plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
-# plt.title("Demodulated Signal")
-# plt.xlabel("Sample Time [n]")
-# plt.ylabel("Amplutide [V]")
-# plt.show()
+# plot demodulated signal
+plt.figure()
+plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
+plt.title("Demodulated Signal")
+plt.xlabel("Sample Time [n]")
+plt.ylabel("Amplutide [V]")
+plt.show()
 
 
 # MATCH FILTER

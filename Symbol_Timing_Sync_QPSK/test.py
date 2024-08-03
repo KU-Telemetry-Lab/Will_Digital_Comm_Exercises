@@ -25,7 +25,7 @@ bits_to_bits_str = dict(zip(bits, bits_str))
 
 
 # TEST SYSTEM ON GIVEN ASCII DATA
-test_file = "qpskdata.mat" # (need to figure out data set import)
+test_file = "qpskscdata.mat" # (need to figure out data set import)
 modulated_data = MatLab.load_matlab_file(test_file)[1]
 data_offset = 12
 pulse_shape = communications.srrc(.5, sample_rate, 32)

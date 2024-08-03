@@ -43,7 +43,7 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # INTRODUCE TIMING OFFSET (NEEDS WORK)
 ###################################################################################################
-timing_offset = 0.0
+timing_offset = 0.5
 xk_upsampled_offset = clock_offset(xk_upsampled, fs, timing_offset)
 yk_upsampled_offset = clock_offset(yk_upsampled, fs, timing_offset)
 
