@@ -165,8 +165,8 @@ yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="sa
 
 # DOWNSAMPLE EACH PULSE
 ##################################################################################################
-xk = DSP.downsample(xr_nT_match_filtered, fs) # removing header
-yk= DSP.downsample(yr_nT_match_filtered, fs) # removing header
+xk = DSP.downsample(xr_nT_match_filtered, fs)
+yk= DSP.downsample(yr_nT_match_filtered, fs)
 rk = xk + 1j * yk
 
 # communications.plot_complex_points(rk, constellation=qpsk_constellation)
@@ -236,7 +236,13 @@ for i in range(len(rk)):
 
 # print(f"Phase Ambiguity Rotation: {np.degrees(uw_offset)} deg\n")
 
-# communications.plot_complex_points(detected_constellations, constellation=qpsk_constellation)
+# constellation plotting
+plt.title("PLL Output Constellations")
+plt.plot(np.real(rotated_constellations), np.imag(rotated_constellations), 'ro', label="Rotated Constellations")
+plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo',  label="Esteimated Constellations")
+plt.legend()
+plt.grid(True)
+plt.show()
 
 # MAKE A DECISION FOR EACH PULSE
 ##################################################################################################
@@ -244,11 +250,6 @@ detected_symbols = communications.nearest_neighbor(detected_constellations[len(h
 symbol_errors = error_count(input_message_symbols[len(unique_word):], detected_symbols)
 print(f"Transmission Symbol Errors: {symbol_errors}")
 print(f"Bit Error Percentage: {round((symbol_errors * 2) / len(detected_symbols), 2)} %")
-
-# constellation plotting
-plt.plot(np.real(rotated_constellations), np.imag(rotated_constellations), 'ro')
-plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo')
-plt.show()
 
 # converting symbols to binary then binary to ascii
 detected_bits = []
