@@ -162,7 +162,7 @@ r_nT = xr_nT_match_filtered + 1j * yr_nT_match_filtered
 
 # SYMBOL TIMING SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = 0.2*fs
+loop_bandwidth = 0.02*fs
 damping_factor = 1/np.sqrt(2)
 scs = SCS.SCS(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
 

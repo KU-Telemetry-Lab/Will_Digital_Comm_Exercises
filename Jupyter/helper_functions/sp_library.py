@@ -201,6 +201,19 @@ def bin_to_char(x):
 
     return ''.join(bin_chars)
 
+def string_to_ascii_binary(string, num_bits=7):
+    return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
+
+def error_count(x, y):
+    return sum(1 for i in range(len(x)) if x[i] != y[i])
+
+def find_subarray_index(small_array, large_array):
+    small_len = len(small_array)
+    for i in range(len(large_array) - small_len + 1):
+        if large_array[i:i + small_len] == small_array:
+            return i
+    return -1
+
 
 # CLASS DEFINITIONS
 ################################################################################################
