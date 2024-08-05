@@ -17,32 +17,18 @@ class PLL():
     phase = 0
     sigOut = 0
 
-    def __init__(self, sample_rate, loop_bandwidth=None, damping_factor=None, kp=1, k0=1, k1=0, k2=0, wstart=1, thetaStart=0):
+    def __init__(self, sample_rate, loop_bandwidth=None, damping_factor=None):
         '''
         Initialize the PLL object with the specified parameters.
 
         :param sample_rate: Float type. The sampling frequency.
         :param loop_bandwidth: Float type, optional. Loop bandwidth. If specified with damping factor, will compute loop filter gains.
         :param damping_factor: Float type, optional. Damping factor. If specified with loop bandwidth, will compute loop filter gains.
-        :param kp: Float type. Proportional gain determined by the system.
-        :param k0: Float type. DDS gain, usually 1 or -1.
-        :param k1: Float type. Loop filter gain feed-forward.
-        :param k2: Float type. Loop filter gain feed-back.
-        :param wstart: Float type. Starting frequency that the received signal is supposed to be at.
-        :param thetaStart: Float type. Initial phase of the signal.
-
-        Initializes the PLL object for repeated use. If left blank, the object will be initialized with default values.
         '''
-        if loop_bandwidth is None and damping_factor is None:
-            self.Kp = kp
-            self.K0 = k0
-            self.K1 = k1
-            self.K2 = k2
-        else:
-            self.compute_loop_constants(sample_rate, loop_bandwidth, damping_factor)
-        self.w0 = wstart
-        self.phase = thetaStart
-        self.sigOut = np.exp(1j * thetaStart)
+        self.compute_loop_constants(sample_rate, loop_bandwidth, damping_factor)
+        self.w0 = 1
+        self.phase = 0
+        self.sigOut = np.exp(1j * 0)
         self.sample_rate = sample_rate
 
     def compute_loop_constants(self, fs, lb, df):
@@ -154,38 +140,73 @@ class PLL():
         """
         return self.phase
 
- 
-phaseShiftStart = 0.5*np.pi/2
-phaseShift = 0
-fs = 500
-w0 = 10
-w0_offset = 5
+# SYSTEM PARAMETERS
+################################################################################################### 
+sig_freq = 10
+sig_phase = 0
 
-incomingSignal = []
-internalSignal = []
-phaseTrack = []
-error = []
- 
-loop_bandwidth = 0.05 * fs
-damping_factor = 1/np.sqrt(2)
+sig_freq_offset = 0
+sig_phase_offset = np.pi / 4
+
+fs = 500  # Sample rate
+
+# Initialize lists to record simulation results
+pll_input = []
+pll_output = []
+pll_detected_phase_record = []
+pll_error_record = []
+
+# PLL INSTANTIATION
+################################################################################################### 
+loop_bandwidth = 0.06 * fs
+damping_factor = 1 / np.sqrt(2)
 pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
 
+# Print loop filter gains for reference
 print(f"Kp: {pll.Kp}")
 print(f"K0: {pll.K0}")
 print(f"K1: {pll.K1}")
 print(f"K2: {pll.K2}")
 
+# PLL SIMULATION
+################################################################################################### 
 for n in range(1000):
-    incomingSignal.append(np.exp(1j*((np.pi*2*(w0 + w0_offset)/fs)*n + phaseShiftStart)))
-    internalSignal.append(pll.insert_new_sample(incomingSignal[n], n))
+    # Generate the input signal
+    input_signal = np.exp(1j * ((2 * np.pi * (sig_freq + sig_freq_offset) / fs) * n + (sig_phase + sig_phase_offset)))
+    # Insert the new sample into the PLL
+    output_signal = pll.insert_new_sample(input_signal, n)
     
-    error.append(pll.phase_detector(internalSignal[n], incomingSignal[n], Kp=1))
-    phaseShift = pll.get_current_phase()
-    phaseTrack.append(phaseShift)
- 
-plt.plot(error, label='Phase error')
-# plt.plot(phaseTrack, label='Phase Track')
-plt.plot(np.real(internalSignal), label='internal Signal')
-plt.plot(np.real(incomingSignal), label='incoming Signal')
+    # Record detected phase and error
+    detected_phase = pll.get_current_phase()
+    error = pll.phase_detector(output_signal, input_signal)
+
+    # Update records
+    pll_input.append(input_signal)
+    pll_output.append(output_signal)
+    pll_detected_phase_record.append(detected_phase)
+    pll_error_record.append(error)
+
+# PLOTTING RESULTS
+################################################################################################### 
+plt.figure(figsize=(12, 8))
+
+# Subplot for Phase Error
+plt.subplot(2, 1, 1)
+plt.plot(pll_error_record, label='Phase Error', color='r')
+plt.title('Phase Error')
+plt.xlabel('Sample Index')
+plt.ylabel('Phase Error (radians)')
+plt.grid()
+
+# Subplot for Input and Output Signals
+plt.subplot(2, 1, 2)
+plt.plot(np.real(pll_input), label='Input Signal', color='b', alpha=0.7)
+plt.plot(np.real(pll_output), label='Output Signal', color='g', alpha=0.7)
+plt.title('Input and Output Signals')
+plt.xlabel('Sample Index')
+plt.ylabel('Amplitude')
 plt.legend()
+plt.grid()
+
+plt.tight_layout()
 plt.show()
