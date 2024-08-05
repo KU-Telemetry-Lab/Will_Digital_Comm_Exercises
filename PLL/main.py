@@ -142,13 +142,13 @@ class PLL():
 
 # SYSTEM PARAMETERS
 ################################################################################################### 
+fs = 500 
+
 sig_freq = 10
-sig_phase = 0
+sig_phase = np.pi / 4
+n = np.arange(0,1000)
+input_signal = np.exp(1j * ((2 * np.pi * (sig_freq) / fs) * n + (sig_phase)))
 
-sig_freq_offset = 0
-sig_phase_offset = np.pi / 4
-
-fs = 500  # Sample rate
 
 # Initialize lists to record simulation results
 pll_input = []
@@ -158,7 +158,7 @@ pll_error_record = []
 
 # PLL INSTANTIATION
 ################################################################################################### 
-loop_bandwidth = 0.06 * fs
+loop_bandwidth = 0.02 * fs
 damping_factor = 1 / np.sqrt(2)
 pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
 
@@ -170,18 +170,16 @@ print(f"K2: {pll.K2}")
 
 # PLL SIMULATION
 ################################################################################################### 
-for n in range(1000):
-    # Generate the input signal
-    input_signal = np.exp(1j * ((2 * np.pi * (sig_freq + sig_freq_offset) / fs) * n + (sig_phase + sig_phase_offset)))
+for i in range(len(n)):
     # Insert the new sample into the PLL
-    output_signal = pll.insert_new_sample(input_signal, n)
+    output_signal = pll.insert_new_sample(input_signal[i], i)
     
     # Record detected phase and error
     detected_phase = pll.get_current_phase()
-    error = pll.phase_detector(output_signal, input_signal)
+    error = pll.phase_detector(output_signal, input_signal[i])
 
     # Update records
-    pll_input.append(input_signal)
+    pll_input.append(input_signal[i])
     pll_output.append(output_signal)
     pll_detected_phase_record.append(detected_phase)
     pll_error_record.append(error)
