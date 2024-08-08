@@ -6,7 +6,8 @@ from scipy import interpolate as intp
 import sys
 sys.path.insert(0, '../KUSignalLib/src')
 from KUSignalLib import DSP
-from KUSignalLib import communications, SCS
+from KUSignalLib import communications
+from SCS import SCS
 
 def string_to_ascii_binary(string, num_bits=7):
     return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
@@ -160,48 +161,23 @@ r_nT = xr_nT_match_filtered + 1j * yr_nT_match_filtered
 # plt.show()
 
 
-# SYMBOL TIMING SYNCHRONIZATION
+# SYMBOL TIMING SYNCHRONIZATAION
 ##################################################################################################
 loop_bandwidth = 0.02*fs
 damping_factor = 1/np.sqrt(2)
-scs = SCS.SCS(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
+scs = SCS(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
 
 for i in range(len(r_nT)):
-    if i == 0: # edge case (start)
-        scs.insert_new_sample(0, r_nT[i], r_nT[i+1])
-    elif i == len(r_nT)-1: # edge case (end)
-        scs.insert_new_sample(r_nT[i-1], r_nT[i], 0)
+    if i < np.floor(fs/2)-1: # start edge case
+        scs.insert_new_sample(0, r_nT[i], r_nT[int(i+np.floor(fs/2))])
+    elif i > (len(r_nT) - 1) - np.floor(fs/2): # end edge case
+        scs.insert_new_sample(r_nT[int(i-np.floor(fs/2))], r_nT[i], 0)
     else:
-        scs.insert_new_sample(r_nT[i-1], r_nT[i], r_nT[i+1])
+        scs.insert_new_sample(r_nT[int(i-np.floor(fs/2))], r_nT[i], r_nT[int(i+np.floor(fs/2))])
 
 # clock synchronized symbol outputs (removing header)
 rk = scs.get_scs_output_record()[len(header):]
 
-# scs output records
-timing_error_record = scs.get_timing_error_record()
-loop_filter_record = scs.get_loop_filter_record()
 
-# DSP.plot_complex_points(rk, referencePoints=amplitudes)
-  
-# plt.figure()
-# plt.stem(timing_error_record, "ro", label="TED")
-# plt.stem(loop_filter_record, "bo", label="Loop Filter")
-# plt.title("SCS Output Records")
-# plt.legend()
-# plt.show()
+DSP.plot_complex_points(rk, referencePoints=amplitudes)
 
-
-# MAKE A DECISION FOR EACH PULSE
-##################################################################################################
-detected_symbols = communications.nearest_neighbor(rk, qpsk_constellation)
-error_count = error_count(input_message_symbols, detected_symbols)
-print(f"Transmission Symbol Errors: {error_count}")
-print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
-
-# converting symbols to binary then binary to ascii
-detected_bits = []
-for symbol in detected_symbols:
-    detected_bits += ([*bin(symbol)[2:].zfill(2)])
-
-message = communications.bin_to_char(detected_bits)
-print(message)
