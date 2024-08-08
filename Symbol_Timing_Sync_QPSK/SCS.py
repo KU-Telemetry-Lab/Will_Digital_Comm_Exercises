@@ -21,12 +21,13 @@ class SCS:
         
         self.adjusted_symbol_block = np.zeros(3, dtype=complex)
         self.timing_error_record = []
+        self.loop_filter_record = []
         self.counter = 0
 
         self.sample_register = np.zeros(samples_per_symbol, dtype=complex)
         self.debugging_flag = False
         
-    def compute_loop_constants(self, loop_bandwidth: float, damping_factor: float, k0: float, kp: float):
+    def compute_loop_constants(self, loop_bandwidth, damping_factor, k0, kp):
         """
         Compute the loop filter gains based on the loop bandwidth and damping factor.
 
@@ -35,12 +36,38 @@ class SCS:
         :param k0: Float type. Loop gain.
         :param kp: Float type. Proportional gain.
         """
-        theta_n = (loop_bandwidth * (1 / self.samples_per_symbol) / self.samples_per_symbol) / (damping_factor + 1 / (4 * damping_factor))
-        factor = (-4 * theta_n) / (1 + 2 * damping_factor * theta_n + theta_n**2)
-        self.k1 = damping_factor * factor / kp
-        self.k2 = theta_n * factor / kp
+        if loop_bandwidth is not None and damping_factor is not None:
+            theta_n = (loop_bandwidth * (1 / self.samples_per_symbol) / self.samples_per_symbol) / (damping_factor + 1 / (4 * damping_factor))
+            factor = (-4 * theta_n) / (1 + 2 * damping_factor * theta_n + theta_n**2)
+            self.k1 = damping_factor * factor / kp
+            self.k2 = theta_n * factor / kp
+        else:
+            self.k1 = 0
+            self.k2 = 0
         self.k0 = k0
         self.kp = kp
+
+    def direct_form_2(self, b, a, x):
+        n = len(b)
+        m = len(a)
+        if n > m:
+            max_len = n
+            a = np.concatenate((a, np.zeros(n - m)))
+        else:
+            max_len = m
+            b = np.concatenate((b, np.zeros(m - n)))
+        denominator = a.copy()
+        denominator[1:] = -denominator[1:]
+        denominator[0] = 0
+        x = np.concatenate((x, np.zeros(max_len - 1)))
+        y = np.zeros(len(x), dtype=complex)
+        delay_line = np.zeros(max_len, dtype=complex)
+        for i, value in enumerate(x):
+            y[i] = np.dot(b, delay_line)
+            tmp = np.dot(denominator, delay_line)
+            delay_line[1:] = delay_line[:-1]
+            delay_line[0] = value * a[0] + tmp
+        return y[1:]
 
     def get_timing_error_record(self):
         """
@@ -82,7 +109,7 @@ class SCS:
             symbol_block_interpolated = interpolation_function(np.linspace(0, len(symbol_block)-1, num=(len(symbol_block)-1) * self.upsample_rate))
 
         else:
-            symbol_block_interpolated = symbol_block_upsampled
+            symbol_block_interpolated = symbol_block
         return symbol_block_interpolated
 
     def loop_filter(self, timing_error):
@@ -121,25 +148,7 @@ class SCS:
             self.sample_register = self.sample_register[1:]
             self.sample_register = np.append(self.sample_register, current_complex_sample)
 
-            # compute timing error
-            tau = self.early_late_ted(self.sample_register[0], self.sample_register[int(self.samples_per_symbol/2)], self.sample_register[-1])
-            tau = tau * self.gain
-
-            # interpolate sample register
-            interpolated_sample_register = self.interpolate(self.sample_register, mode="linear")
-
-            # correct timing offfset
-            corrected_symbol = interpolated_sample_register[int((self.samples_per_symbol/2) + tau)]
-
-            if self.debugging_flag == False:
-                print(tau)
-
-                plt.figure()
-                plt.stem(np.imag(self.sample_register))
-
-                plt.show()
-
-                self.debugging_flag = True
+            corrected_symbol = 0
 
             self.counter = 0
             return corrected_symbol

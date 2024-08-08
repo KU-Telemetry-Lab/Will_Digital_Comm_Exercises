@@ -118,7 +118,7 @@ yk_upsampled = clock_offset(yk_upsampled, fs, timing_offset)[sample_shift:]
 # PULSE SHAPE
 ###################################################################################################
 length = 64
-alpha = 0.01
+alpha = 0.10
 pulse_shape = communications.srrc(alpha, fs, length)
 
 xk_pulse_shaped = np.real(np.roll(DSP.convolve(xk_upsampled, pulse_shape, mode="same"), -1))
@@ -137,15 +137,40 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 # plt.show()
 
 
+# DIGITAL MODULATION
+##################################################################################################
+s_RF = (
+    np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc, fs)) +
+    np.sqrt(2) * np.imag(DSP.modulate_by_exponential(yk_pulse_shaped, fc, fs))
+)
 
-# ADD MODULATION AND DEMODULATION HERE LATER
+# # plot modulated RF signal
+# plt.figure()
+# plt.stem(s_RF[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Modulated Signal")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+# plt.show()
 
+
+# DIGITAL DEMODULATIOIN
+##################################################################################################
+xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_RF, fc, fs))
+yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
+
+# # plot demodulated signal
+# plt.figure()
+# plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Demodulated Signal")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+# plt.show()
 
 
 # MATCH FILTER
 ##################################################################################################
-xr_nT_match_filtered = np.real(DSP.convolve(xk_pulse_shaped, pulse_shape, mode="same"))[(len(header) + 2) *fs:]
-yr_nT_match_filtered = np.real(DSP.convolve(yk_pulse_shaped, pulse_shape, mode="same"))[(len(header) + 2) *fs:]
+xr_nT_match_filtered = np.real(np.roll(DSP.convolve(xr_nT, pulse_shape, mode="same"), -1))
+yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="same"), -1))
 r_nT = xr_nT_match_filtered + 1j * yr_nT_match_filtered
 
 # # plot match filtered signal
@@ -159,9 +184,9 @@ r_nT = xr_nT_match_filtered + 1j * yr_nT_match_filtered
 
 # SYMBOL TIMING SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = 0.2*fs
+loop_bandwidth = .2*fs
 damping_factor = 1/np.sqrt(2)
-scs = SCS(samples_per_symbol=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=2)
+scs = SCS(samples_per_symbol=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=4)
 
 corrected_symbols = []
 
@@ -170,7 +195,7 @@ for i in range(len(r_nT)):
     if corrected_symbol is not None:
         corrected_symbols.append(corrected_symbol)
 
-plot_complex_points(corrected_symbols, constellation=qpsk_constellation)
+# plot_complex_points(corrected_symbols, constellation=qpsk_constellation)
 
 # timing_error_record = scs.get_timing_error_record()
 

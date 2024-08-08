@@ -147,7 +147,7 @@ xk = DSP.downsample(xr_nT_match_filtered, fs)[len(header):] # removing header
 yk= DSP.downsample(yr_nT_match_filtered, fs)[len(header):] # removing header
 rk = xk + 1j * yk
 
-# communications.plot_complex_points(rk, constellation=qpsk_constellation)
+communications.plot_complex_points(rk, constellation=qpsk_constellation)
 
 
 # MAKE A DECISION FOR EACH PULSE
