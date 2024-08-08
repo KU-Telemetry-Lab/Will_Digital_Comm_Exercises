@@ -66,13 +66,13 @@ yk = np.concatenate([header, yk])
 xk_upsampled = DSP.upsample(xk, fs, interpolate_flag=False)
 yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
-# # plot upsampled symbols
-# plt.figure()
-# plt.stem(yk_upsampled[len(header)*fs:(len(header)+5)*fs])
-# plt.title("Upsampled Symbols")
-# plt.xlabel("Sample Time [n]")
-# plt.ylabel("Amplutide [V]")
-# plt.show()
+# plot upsampled symbols
+plt.figure()
+plt.stem(yk_upsampled[len(header)*fs:(len(header)+5)*fs])
+plt.title("Upsampled Symbols")
+plt.xlabel("Sample Time [n]")
+plt.ylabel("Amplutide [V]")
+plt.show()
 
 
 # PULSE SHAPE
@@ -84,17 +84,17 @@ pulse_shape = communications.srrc(alpha, fs, length)
 xk_pulse_shaped = np.real(np.roll(DSP.convolve(xk_upsampled, pulse_shape, mode="same"), -1))
 yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="same"), -1))
 
-# # plot pulse shaped signal
-# plt.figure()
-# plt.stem(yk_pulse_shaped[len(header)*fs:(len(header)+5)*fs])
-# plt.title("Pulse Shaped Signal")
-# plt.xlabel("Sample Time [n]")
-# plt.ylabel("Amplutide [V]")
+# plot pulse shaped signal
+plt.figure()
+plt.stem(yk_pulse_shaped[len(header)*fs:(len(header)+5)*fs])
+plt.title("Pulse Shaped Signal")
+plt.xlabel("Sample Time [n]")
+plt.ylabel("Amplutide [V]")
 
-# print(f"\nFilter Length: {length} samples")
-# print(f"Message Length: {alpha} percent")
-# print(f"Sample Rate: {fs} samples per symbol\n")
-# plt.show()
+print(f"\nFilter Length: {length} samples")
+print(f"Message Length: {alpha} percent")
+print(f"Sample Rate: {fs} samples per symbol\n")
+plt.show()
 
 
 # DIGITAL MODULATION
@@ -147,7 +147,7 @@ xk = DSP.downsample(xr_nT_match_filtered, fs)[len(header):] # removing header
 yk= DSP.downsample(yr_nT_match_filtered, fs)[len(header):] # removing header
 rk = xk + 1j * yk
 
-communications.plot_complex_points(rk, constellation=qpsk_constellation)
+# communications.plot_complex_points(rk, constellation=qpsk_constellation)
 
 
 # MAKE A DECISION FOR EACH PULSE

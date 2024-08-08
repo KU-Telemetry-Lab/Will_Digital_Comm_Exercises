@@ -3,37 +3,28 @@ from scipy import interpolate as intp
 import matplotlib.pyplot as plt
 
 class SCS:
-    def __init__(self, samples_per_symbol, loop_bandwidth=None, damping_factor=None, k0=1, kp=1, k1=0, k2=0, upsample_rate=10):
+    def __init__(self, samples_per_symbol, loop_bandwidth=None, damping_factor=None, gain=1, upsample_rate=3):
         '''
         Initialize the SCS (Symbol Clock Synchronization) subsystem class.
 
         :param samples_per_symbol: Int type. Number of samples per symbol.
         :param loop_bandwidth: Float type. Determines the lock-on speed to the timing error (similar to PLL).
         :param damping_factor: Float type. Determines the oscillation during lock-on to the timing error (similar to PLL).
-        :param kp: Float type. Proportional gain.
-        :param k0: Float type. Loop gain.
-        :param k1: Float type. Loop filter coefficient one.
-        :param k2: Float type. Loop filter coefficient two.
         :param upsample_rate: Int type. Upsample rate of timing error correction interpolation.
         '''
         self.samples_per_symbol = samples_per_symbol
         self.upsample_rate = upsample_rate
-
+        self.gain = gain
+        
+        self.compute_loop_constants(loop_bandwidth, damping_factor, k0=1, kp=1)
         self.k2_prev = 0
-        if loop_bandwidth is None and damping_factor is None:
-            self.kp = kp
-            self.k0 = k0
-            self.k1 = k1
-            self.k2 = k2
-        else:
-            self.compute_loop_constants(loop_bandwidth, damping_factor, k0, kp)
         
         self.adjusted_symbol_block = np.zeros(3, dtype=complex)
         self.timing_error_record = []
-        self.loop_filter_record = []
-        self.counter = samples_per_symbol - 1
-        
-        self.scs_output_record = []
+        self.counter = 0
+
+        self.sample_register = np.zeros(samples_per_symbol, dtype=complex)
+        self.debugging_flag = False
         
     def compute_loop_constants(self, loop_bandwidth: float, damping_factor: float, k0: float, kp: float):
         """
@@ -67,14 +58,6 @@ class SCS:
         """
         return np.array(self.loop_filter_record)
 
-    def get_scs_output_record(self):
-        """
-        Get the recorded SCS outputs.
-        
-        :return: Numpy array type. Recorded SCS outputs.
-        """
-        return np.array(self.scs_output_record)
-
     def interpolate(self, symbol_block, mode='cubic'):
         """
         Discrete signal upsample implementation.
@@ -92,10 +75,12 @@ class SCS:
             new_indices = np.arange(len(symbol_block_upsampled))
             interpolation_function = intp.interp1d(nonzero_indices, nonzero_values, kind="linear", fill_value='extrapolate')
             symbol_block_interpolated = interpolation_function(new_indices)
+
         elif mode == "cubic":
             symbol_block = np.append(symbol_block, 0)
             interpolation_function = intp.CubicSpline(np.arange(0, len(symbol_block)), symbol_block)
             symbol_block_interpolated = interpolation_function(np.linspace(0, len(symbol_block)-1, num=(len(symbol_block)-1) * self.upsample_rate))
+
         else:
             symbol_block_interpolated = symbol_block_upsampled
         return symbol_block_interpolated
@@ -114,45 +99,55 @@ class SCS:
         self.loop_filter_record.append(output)
         return output
 
-    def early_late_ted(self, symbol_block):
+    def early_late_ted(self, early_sample, current_sample, late_sample):
         """
         Early-late Timing Error Detector (TED) implementation.
         
         :return: Float type. The calculated timing error.
         """
-        timing_error = (np.real(symbol_block[1]) * (np.real(symbol_block[2]) - np.real(symbol_block[0])))
-        timing_error = timing_error * (1/self.samples_per_symbol)
+        timing_error = np.real(current_sample) * (np.real(late_sample) - np.real(early_sample))
         self.timing_error_record.append(timing_error)
         return timing_error
 
-    def insert_new_sample(self, complex_early_sample, complex_on_time_sample, complex_late_sample):
+    def insert_new_sample(self, current_complex_sample):
         """
         Insert new samples for processing.
 
-        :param complex_early_sample: Complex type. Early sample.
-        :param complex_on_time_sample: Complex type. On-time sample.
-        :param complex_late_sample: Complex type. Late sample.
+        :param current_complex_sample: Complex numpy dtype. Info.
         """
+
         if self.counter == self.samples_per_symbol - 1:
-            symbol_block = np.array([complex_early_sample, complex_on_time_sample, complex_late_sample])
-            timing_error = self.early_late_ted(symbol_block)
+            # update samples register
+            self.sample_register = self.sample_register[1:]
+            self.sample_register = np.append(self.sample_register, current_complex_sample)
 
-            symbol_block_interpolated = self.interpolate(symbol_block, mode='cubic')
+            # compute timing error
+            tau = self.early_late_ted(self.sample_register[0], self.sample_register[int(self.samples_per_symbol/2)], self.sample_register[-1])
+            tau = tau * self.gain
 
-            # loop_filter_output = self.loop_filter(timing_error)
-        
-            adjusted_timing_error = self.upsample_rate + int(timing_error * self.upsample_rate)
+            # interpolate sample register
+            interpolated_sample_register = self.interpolate(self.sample_register, mode="linear")
 
-            # # maybe delete
-            # self.adjusted_symbol_block = np.array([
-            #     symbol_block_interpolated[adjusted_on_time_index - self.upsample_rate],
-            #     symbol_block_interpolated[adjusted_on_time_index],
-            #     symbol_block_interpolated[adjusted_on_time_index + self.upsample_rate]
-            # ], dtype=complex)
+            # correct timing offfset
+            corrected_symbol = interpolated_sample_register[int((self.samples_per_symbol/2) + tau)]
+
+            if self.debugging_flag == False:
+                print(tau)
+
+                plt.figure()
+                plt.stem(np.imag(self.sample_register))
+
+                plt.show()
+
+                self.debugging_flag = True
 
             self.counter = 0
-            self.scs_output_record.append(symbol_block_interpolated[adjusted_timing_error])
-            return symbol_block_interpolated[adjusted_timing_error]
+            return corrected_symbol
+
         else:
+            # update samples register
+            self.sample_register = self.sample_register[1:]
+            self.sample_register = np.append(self.sample_register, current_complex_sample)
+
             self.counter += 1
             return None

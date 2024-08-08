@@ -23,6 +23,22 @@ def clock_offset(signal, sample_rate, offset_fraction):
     x_shifted = interpolator(t_shifted)
     return x_shifted
 
+def plot_complex_points(complex_array, constellation):
+    plt.plot([point.real for point in complex_array], [point.imag for point in complex_array], 'ro', label='Received Points')
+    for point, label in constellation:
+        plt.plot(point.real, point.imag, 'b+', markersize=10)
+        plt.text(point.real, point.imag, f' {label}', fontsize=12, verticalalignment='bottom', horizontalalignment='right')
+    
+    plt.xlabel('In-Phase (I)')
+    plt.ylabel('Quadrature (Q)')
+    plt.title('Complex Constellation Plot')
+    plt.axhline(0, color='gray', lw=0.5, ls='--')
+    plt.axvline(0, color='gray', lw=0.5, ls='--')
+    plt.grid()
+    plt.axis('equal')
+    plt.legend()
+    plt.show()
+
 
 # SYSTEM PARAMETERS
 ###################################################################################################
@@ -83,25 +99,30 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 # plt.ylabel("Amplutide [V]")
 # plt.show()
 
+# # plot upsampled constellation
+# plot_complex_points((xk_upsampled + 1j * yk_upsampled), constellation=qpsk_constellation)
 
-# INTRODUCE TIMING OFFSET (NEEDS WORK)
+
+# INTRODUCE TIMING OFFSET
 ###################################################################################################
-timing_offset = 0.0
-xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)
-yk_upsampled = clock_offset(yk_upsampled, fs, timing_offset)
+timing_offset = 0
+sample_shift = 0 # int(fs/3)
 
-amplitudes = [i[0] for i in qpsk_constellation]
-# DSP.plot_complex_points((xk_upsampled + 1j*yk_upsampled), referencePoints=amplitudes)
+xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
+yk_upsampled = clock_offset(yk_upsampled, fs, timing_offset)[sample_shift:]
+
+# # plot timing offset constellation
+# plot_complex_points((xk_upsampled + 1j*yk_upsampled), constellation=qpsk_constellation)
 
 
 # PULSE SHAPE
 ###################################################################################################
 length = 64
-alpha = 0.10
+alpha = 0.01
 pulse_shape = communications.srrc(alpha, fs, length)
 
-xk_pulse_shaped = np.real(DSP.convolve(xk_upsampled, pulse_shape, mode="same"))
-yk_pulse_shaped = np.real(DSP.convolve(yk_upsampled, pulse_shape, mode="same"))
+xk_pulse_shaped = np.real(np.roll(DSP.convolve(xk_upsampled, pulse_shape, mode="same"), -1))
+yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="same"), -1))
 
 # # plot pulse shaped signal
 # plt.figure()
@@ -116,40 +137,15 @@ yk_pulse_shaped = np.real(DSP.convolve(yk_upsampled, pulse_shape, mode="same"))
 # plt.show()
 
 
-# DIGITAL MODULATION
-##################################################################################################
-s_RF = (
-    np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc, fs)) +
-    np.sqrt(2) * np.imag(DSP.modulate_by_exponential(yk_pulse_shaped, fc, fs))
-)
 
-# # plot modulated RF signal
-# plt.figure()
-# plt.stem(s_RF[len(header)*fs:(len(header)+5)*fs])
-# plt.title("Modulated Signal")
-# plt.xlabel("Sample Time [n]")
-# plt.ylabel("Amplutide [V]")
-# plt.show()
+# ADD MODULATION AND DEMODULATION HERE LATER
 
-
-# DIGITAL DEMODULATIOIN
-##################################################################################################
-xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_RF, fc, fs))
-yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
-
-# # plot demodulated signal
-# plt.figure()
-# plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
-# plt.title("Demodulated Signal")
-# plt.xlabel("Sample Time [n]")
-# plt.ylabel("Amplutide [V]")
-# plt.show()
 
 
 # MATCH FILTER
 ##################################################################################################
-xr_nT_match_filtered = np.real(DSP.convolve(xr_nT, pulse_shape, mode="same"))
-yr_nT_match_filtered = np.real(DSP.convolve(yr_nT, pulse_shape, mode="same"))
+xr_nT_match_filtered = np.real(DSP.convolve(xk_pulse_shaped, pulse_shape, mode="same"))[(len(header) + 2) *fs:]
+yr_nT_match_filtered = np.real(DSP.convolve(yk_pulse_shaped, pulse_shape, mode="same"))[(len(header) + 2) *fs:]
 r_nT = xr_nT_match_filtered + 1j * yr_nT_match_filtered
 
 # # plot match filtered signal
@@ -161,23 +157,27 @@ r_nT = xr_nT_match_filtered + 1j * yr_nT_match_filtered
 # plt.show()
 
 
-# SYMBOL TIMING SYNCHRONIZATAION
+# SYMBOL TIMING SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = 0.02*fs
+loop_bandwidth = 0.2*fs
 damping_factor = 1/np.sqrt(2)
-scs = SCS(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
+scs = SCS(samples_per_symbol=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=2)
+
+corrected_symbols = []
 
 for i in range(len(r_nT)):
-    if i < np.floor(fs/2)-1: # start edge case
-        scs.insert_new_sample(0, r_nT[i], r_nT[int(i+np.floor(fs/2))])
-    elif i > (len(r_nT) - 1) - np.floor(fs/2): # end edge case
-        scs.insert_new_sample(r_nT[int(i-np.floor(fs/2))], r_nT[i], 0)
-    else:
-        scs.insert_new_sample(r_nT[int(i-np.floor(fs/2))], r_nT[i], r_nT[int(i+np.floor(fs/2))])
+    corrected_symbol = scs.insert_new_sample(r_nT[i])
+    if corrected_symbol is not None:
+        corrected_symbols.append(corrected_symbol)
 
-# clock synchronized symbol outputs (removing header)
-rk = scs.get_scs_output_record()[len(header):]
+plot_complex_points(corrected_symbols, constellation=qpsk_constellation)
 
+# timing_error_record = scs.get_timing_error_record()
 
-DSP.plot_complex_points(rk, referencePoints=amplitudes)
+# plt.figure()
+# plt.stem(timing_error_record, "ro", label="TED")
+# plt.title("SCS Output Records")
+# plt.legend()
+# plt.show()
 
+    
