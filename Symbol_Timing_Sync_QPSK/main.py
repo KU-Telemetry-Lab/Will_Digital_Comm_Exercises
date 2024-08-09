@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, '../KUSignalLib/src')
 from KUSignalLib import DSP
 from KUSignalLib import communications
-from SCS import SCS
+from SCS2 import SCS2
 
 def string_to_ascii_binary(string, num_bits=7):
     return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
@@ -196,45 +196,26 @@ r_nT = (xr_nT_downsampled + 1j* yr_nT_downsampled)
 # plt.ylabel("Amplutide [V]")
 # plt.show()
 
-# plot_complex_points(r_nT, constellation=qpsk_constellation)
+plot_complex_points(r_nT, constellation=qpsk_constellation)
 
 # SYMBOL TIMING SYNCHRONIZATION
 ##################################################################################################
 loop_bandwidth = (fc/fs)*0.2
 damping_factor = 1/np.sqrt(2)
-scs = SCS(samples_per_symbol=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=25.22)
+
+scs = SCS2(loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, sampsPerSym=2, kp=30)
 corrected_constellations = []
+
 maxt = 0
+
 for i in range(len(r_nT)):
     corrected_constellation = scs.insert_new_sample(r_nT[i])
-    if not scs.strobe:
+    if scs.strobe:
         corrected_constellations.append(corrected_constellation)
 
-# plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
+    if scs.probe > maxt:
+        maxt = scs.probe
 
-# # DEBUGGING !!!
-# print(len(xk))
-# print(len(corrected_constellations))
-# print(np.mean(scs.ted_output_record))
-
-
-# MAKE A DECISION FOR EACH PULSE (NEED SOME SORT OF UNIQUE WORD INDEX)
-##################################################################################################
-detected_symbols = communications.nearest_neighbor(corrected_constellations, qpsk_constellation)
-
-# removing header and adjusting for symbol timing synchronization delay
-detected_symbols = detected_symbols[len(header)+8:]
-
-# error_count = error_count(input_message_symbols, detected_symbols)
-
-# print(f"Transmission Symbol Errors: {error_count}")
-# print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
-
-# converting symbols to binary then binary to ascii
-detected_bits = []
-for symbol in detected_symbols:
-    detected_bits += ([*bin(symbol)[2:].zfill(2)])
-
-message = communications.bin_to_char(detected_bits)
-print(message)
+print(maxt)
+plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
 

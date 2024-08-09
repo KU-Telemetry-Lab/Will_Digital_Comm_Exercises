@@ -61,7 +61,7 @@ xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
 # adding header to each channel
-header = [1,0] * 25
+header = [1,0] * 100
 xk = np.concatenate([header, xk])
 yk = np.concatenate([header, yk])
 
@@ -118,8 +118,8 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 # DIGITAL MODULATION
 ##################################################################################################
 # synchronization offsets
-fc_offset = 0.05
-phase_offset = np.pi/5
+fc_offset = 0.0
+phase_offset = 0
 
 s_RF = (
     np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc + fc_offset, fs)) +
@@ -188,7 +188,7 @@ uw_offset = 0
 
 # CARRIER PHASE SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = 10*fs
+loop_bandwidth = 0.2*fs
 damping_factor = 1/np.sqrt(2)
 pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
 
