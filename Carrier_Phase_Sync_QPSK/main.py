@@ -188,7 +188,7 @@ uw_offset = 0
 
 # CARRIER PHASE SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = 0.2*fs
+loop_bandwidth = (fc/fs)*0.2
 damping_factor = 1/np.sqrt(2)
 pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
 

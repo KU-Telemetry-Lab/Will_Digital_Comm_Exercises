@@ -1,7 +1,7 @@
 import numpy as np
 
 class SCS:
-    def __init__(self, samples_per_symbol, loop_bandwidth, damping_factor, gain=1, mode='parabolic'):
+    def __init__(self, samples_per_symbol, loop_bandwidth, damping_factor, gain=1):
         '''
         Initialize the SCS (Symbol Clock Synchronization) subsystem class.
 
@@ -9,13 +9,10 @@ class SCS:
         :param loop_bandwidth: Float type. Determines the lock-on speed to the timing error (similar to PLL).
         :param damping_factor: Float type. Determines the oscillation during lock-on to the timing error (similar to PLL).
         :param gain: Float type. Gain added to timing error detector output (symbolizes Kp).
-        :param strobe_start: Boolean type. Flag to start with strobe at beginning of simulation.
-        :param mode: String type. Interpolation mode, either 'parabolic' or 'cubic'.
         '''
         self.samples_per_symbol = samples_per_symbol
         self.gain = gain
         self.strobe = None
-        self.mode = mode
 
         self.compute_loop_constants(loop_bandwidth, damping_factor, samples_per_symbol)
 
@@ -24,7 +21,7 @@ class SCS:
         self.interpolated_register = np.zeros(3, dtype=complex)
 
         self.LFK2_prev = 0
-        self.w_n_prev = 0
+        self.decrementor_prev = 0
         self.mu = 0
 
         self.ted_output_record = []
@@ -53,34 +50,44 @@ class SCS:
         :param input_sample: Numpy array. Input samples as complex numbers.
         :return: Complex. The interpolated output sample.
         """
-        if self.mode == 'parabolic':  
-            interpolated_sample = self.farrow_interpolator_parabolic(input_sample)
-        else:  
-            interpolated_sample = self.farrow_interpolator_cubic(input_sample)
+        interpolated_sample = self.farrow_interpolator_parabolic(input_sample)
         
+        # timing error detector
         error = self.early_late_ted()
+        # loop filter
         filtered_error = self.loop_filter(error)
-
+        # normalize loop filter output gain
         if self.gain_probe < filtered_error:
             self.gain_probe = filtered_error
 
+        # calculate w(n)
         w_n = filtered_error + (1 / self.samples_per_symbol)
-        w_n = self.w_n_prev - w_n
 
-        if w_n < 0:
+        # update mod 1 decrementor
+        decrementor = self.decrementor_prev - w_n
+
+        # check mod 1 decrementor
+        if decrementor < 0:
             self.strobe = True
-            w_n = w_n + 1 # mod 1
+            decrementor = decrementor + 1 # mod 1
         else:
             self.strobe = False
         
+        # calculate mu
         if self.strobe:
-            self.mu = self.w_n_prev / (self.w_n_prev - (w_n - 1))
+            self.mu = self.decrementor_prev / w_n
     
+        # update interpolation register (shift)
         self.interpolated_register = np.roll(self.interpolated_register, -1)
         self.interpolated_register[-1] = interpolated_sample
-        self.w_n_prev = w_n
 
-        return interpolated_sample
+        # store decrementor value
+        self.decrementor_prev = decrementor
+
+        if self.strobe:
+            return interpolated_sample
+        else:
+            return None
 
     def farrow_interpolator_parabolic(self, input_sample):
         """
@@ -97,31 +104,6 @@ class SCS:
         v1 = d1next - self.delay_register_1[2] + self.delay_register_2[1] + self.delay_register_1[1] + self.delay_register_1[0]
         v0 = self.delay_register_2[0]
         output = (((v2 * self.mu) + v1) * self.mu + v0)
-
-        self.delay_register_1 = np.roll(self.delay_register_1, -1)
-        self.delay_register_2 = np.roll(self.delay_register_2, -1)
-        self.delay_register_1[-1] = d1next
-        self.delay_register_2[-1] = d2next
-
-        self.mu = tmp
-        return output
-    
-    def farrow_interpolator_cubic(self, input_sample):
-        """
-        Perform cubic interpolation on the input signal.
-
-        :param input: Numpy array. The input signal to be interpolated.
-        :return: Complex. The interpolated output sample.
-        """
-        tmp = self.mu
-        d1next = input_sample
-        d2next = input_sample
-
-        v3 =  (1 / 6) * d1next - (1 / 2) * self.delay_register_1[2] + (1 / 2) * self.delay_register_1[1] - (1 / 6) * self.delay_register_1[0]
-        v2 =                     (1 / 2) * self.delay_register_1[2] -           self.delay_register_1[1] + (1 / 2) * self.delay_register_1[0]
-        v1 = (-1 / 6) * d1next           + self.delay_register_1[2] - (1 / 2) * self.delay_register_1[1] - (1 / 3) * self.delay_register_1[0]
-        v0 =                                                                                                         self.delay_register_2[0]
-        output = ((v3 * self.mu + v2) * self.mu + v1) * self.mu + v0
 
         self.delay_register_1 = np.roll(self.delay_register_1, -1)
         self.delay_register_2 = np.roll(self.delay_register_2, -1)
