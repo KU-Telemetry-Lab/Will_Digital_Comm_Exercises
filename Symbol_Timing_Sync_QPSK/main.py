@@ -106,7 +106,7 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # INTRODUCE TIMING OFFSET
 ###################################################################################################
-timing_offset = 0
+timing_offset = 0.4
 sample_shift = 0
 
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
@@ -202,10 +202,10 @@ r_nT = (xr_nT_downsampled + 1j* yr_nT_downsampled)
 
 # SYMBOL TIMING SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = (fc/fs)*0.01
+loop_bandwidth = (fc/fs)*0.03
 damping_factor = 1/np.sqrt(2)
 
-scs = SCS(samples_per_symbol=2, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=200)
+scs = SCS(samples_per_symbol=2, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=100)
 
 corrected_constellations = []
 for i in range(len(r_nT)):
@@ -215,22 +215,22 @@ for i in range(len(r_nT)):
 
 plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
 
-# # MAKE A DECISION FOR EACH PULSE
-# ##################################################################################################
-# detected_symbols = communications.nearest_neighbor(corrected_constellations, qpsk_constellation)
+# MAKE A DECISION FOR EACH PULSE
+##################################################################################################
+detected_symbols = communications.nearest_neighbor(corrected_constellations, qpsk_constellation)
 
-# # removing header and adjusting for symbol timing synchronization delay
-# detected_symbols = np.roll(detected_symbols[len(header):], -2)
+# removing header and adjusting for symbol timing synchronization delay
+detected_symbols = np.roll(detected_symbols[len(header):], -2)
 
-# error_count = error_count(input_message_symbols, detected_symbols)
+error_count = error_count(input_message_symbols, detected_symbols)
 
-# print(f"Transmission Symbol Errors: {error_count}")
-# print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
+print(f"Transmission Symbol Errors: {error_count}")
+print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
 
-# # converting symbols to binary then binary to ascii
-# detected_bits = []
-# for symbol in detected_symbols:
-#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
+# converting symbols to binary then binary to ascii
+detected_bits = []
+for symbol in detected_symbols:
+    detected_bits += ([*bin(symbol)[2:].zfill(2)])
 
-# message = communications.bin_to_char(detected_bits)
-# print(message)
+message = communications.bin_to_char(detected_bits)
+print(message)
