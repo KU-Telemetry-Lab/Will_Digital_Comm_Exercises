@@ -61,7 +61,7 @@ xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
 # adding header to each channel
-header = np.ones(25)
+header = [1,0] * 25
 xk = np.concatenate([header, xk])
 yk = np.concatenate([header, yk])
 
@@ -118,7 +118,7 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 # DIGITAL MODULATION
 ##################################################################################################
 # synchronization offsets
-fc_offset = 0
+fc_offset = 0.05
 phase_offset = np.pi/5
 
 s_RF = (
@@ -188,7 +188,7 @@ uw_offset = 0
 
 # CARRIER PHASE SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = 0.02*fs
+loop_bandwidth = 10*fs
 damping_factor = 1/np.sqrt(2)
 pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
 
@@ -232,9 +232,17 @@ for i in range(len(rk)):
     # generate next dds output
     dds_output = np.exp(1j * loop_filter_output)
 
-# print(f"Phase Ambiguity Rotation: {np.degrees(uw_offset)} deg\n")
+print(f"Phase Ambiguity Rotation: {np.degrees(uw_offset)} deg\n")
 
-# constellation plotting
+# phase error and constellation plotting
+plt.figure()
+plt.plot(pll_error_record, label='Phase Error', color='r')
+plt.title('Phase Error')
+plt.xlabel('Sample Index')
+plt.ylabel('Phase Error (radians)')
+plt.grid()
+plt.show()
+
 plt.title("PLL Output Constellations")
 plt.plot(np.real(rotated_constellations), np.imag(rotated_constellations), 'ro', label="Rotated Constellations")
 plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo',  label="Esteimated Constellations")
