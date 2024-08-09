@@ -51,11 +51,10 @@ class SCS:
         self.k0 = k0
         self.kp = kp
 
-    def insert_new_sample(self, i, input_sample):
+    def insert_new_sample(self, input_sample):
         """
         Insert a new sample into the SCS system, performing interpolation and updating the timing error.
 
-        :param i: Int type. The index of the current sample.
         :param input_sample: Numpy array. Input samples as complex numbers.
         :return: Complex. The interpolated output sample.
         """
@@ -75,12 +74,6 @@ class SCS:
         self.delta_e_prev = filtered_error
         self.interpolated_register = np.roll(self.interpolated_register, -1)
         self.interpolated_register[-1] = interpolated_sample
-
-        # if self.debugging_flag == False:
-        #     print(interpolated_sample)
-        #     print(input_sample)
-        #     print(self.interpolated_register)
-        #     self.debugging_flag = True
 
         return interpolated_sample
 
