@@ -172,6 +172,20 @@ rk = xk + 1j * yk
 # communications.plot_complex_points(rk, constellation=qpsk_constellation)
 
 
+# UNIQUE WORD RESOLUTION
+##################################################################################################
+def check_unique_word(uw_register):
+    uw_register = ''.join(uw_register)
+    if uw_register in phase_ambiguities.keys():
+        return phase_ambiguities[uw_register]
+    else:
+        return None
+
+uw_register = ['0', '0', '0', '0', '0', '0', '0', '0']
+uw_flag = False
+uw_offset = 0
+
+
 # CARRIER PHASE SYNCHRONIZATION
 ##################################################################################################
 loop_bandwidth = 0.02*fs
@@ -185,24 +199,8 @@ pll_loop_filter_record = []
 rotated_constellations = []
 detected_constellations = []
 
-# UNIQUE WORD RESOLUTION
-##################################################################################################
-def check_unique_word(uw_register):
-    uw_register = ''.join(uw_register)
-    if uw_register in phase_ambiguities.keys():
-        return phase_ambiguities[uw_register]
-    else:
-        return None
-
-uw_register = ['0', '0', '0', '0', '0', '0', '0', '0']
-uw_flag = False
-
 dds_output = np.exp(1j * 0)
-uw_offset = 0
 
-
-# PLL SIMULATION
-##################################################################################################
 for i in range(len(rk)):
     # perform ccw rotation
     rk_ccwr = rk[i] * dds_output * np.exp(1j * uw_offset)

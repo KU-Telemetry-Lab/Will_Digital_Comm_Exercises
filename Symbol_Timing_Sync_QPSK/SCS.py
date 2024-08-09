@@ -1,32 +1,31 @@
 import numpy as np
-from scipy import interpolate as intp
-import matplotlib.pyplot as plt
 
 class SCS:
-    def __init__(self, samples_per_symbol, loop_bandwidth=None, damping_factor=None, gain=1, upsample_rate=3):
+    def __init__(self, samples_per_symbol, loop_bandwidth, damping_factor, gain=1, strobe_start=False, mode='parabolic'):
         '''
         Initialize the SCS (Symbol Clock Synchronization) subsystem class.
 
         :param samples_per_symbol: Int type. Number of samples per symbol.
         :param loop_bandwidth: Float type. Determines the lock-on speed to the timing error (similar to PLL).
         :param damping_factor: Float type. Determines the oscillation during lock-on to the timing error (similar to PLL).
-        :param upsample_rate: Int type. Upsample rate of timing error correction interpolation.
+        :param gain: Float type. Gain added to timing error detector output (symbolizes Kp).
+        :param strobe_start: Boolean type. Flag to start with strobe at beginning of simulation.
+        :param mode: String type. Interpolation mode, either 'parabolic' or 'cubic'.
         '''
         self.samples_per_symbol = samples_per_symbol
-        self.upsample_rate = upsample_rate
         self.gain = gain
-        
-        self.compute_loop_constants(loop_bandwidth, damping_factor, k0=1, kp=1)
-        self.k2_prev = 0
-        
-        self.adjusted_symbol_block = np.zeros(3, dtype=complex)
-        self.timing_error_record = []
-        self.loop_filter_record = []
-        self.counter = 0
+        self.strobe = strobe_start
+        self.mode = mode
+        self.compute_loop_constants(loop_bandwidth, damping_factor, k0=1, kp=gain)
 
-        self.sample_register = np.zeros(samples_per_symbol, dtype=complex)
-        self.debugging_flag = False
-        
+        self.delay_register_1 = np.zeros(3, dtype=complex)
+        self.delay_register_2 = np.zeros(3, dtype=complex)
+        self.interpolated_register = np.zeros(3, dtype=complex)
+
+        self.delta_e = 0
+        self.delta_e_prev = 0
+        self.LFK2_prev = 0
+
     def compute_loop_constants(self, loop_bandwidth, damping_factor, k0, kp):
         """
         Compute the loop filter gains based on the loop bandwidth and damping factor.
@@ -47,116 +46,116 @@ class SCS:
         self.k0 = k0
         self.kp = kp
 
-    def direct_form_2(self, b, a, x):
-        n = len(b)
-        m = len(a)
-        if n > m:
-            max_len = n
-            a = np.concatenate((a, np.zeros(n - m)))
+    def insert_new_sample(self, i, input_sample):
+        """
+        Insert a new sample into the SCS system, performing interpolation and updating the timing error.
+
+        :param i: Int type. The index of the current sample.
+        :param input_sample: Numpy array. Input samples as complex numbers.
+        :return: Complex. The interpolated output sample.
+        """
+        if i % 2 == 0:
+            interpolated_sample = complex(0, 0)
+            if self.mode == 'parabolic':  
+                interpolated_sample = self.farrow_interpolator_parabolic(input_sample)
+            else:  
+                interpolated_sample = self.farrow_interpolator_cubic(input_sample)
+            
+            error = self.early_late_ted()
+            filtered_error = self.loop_filter(error)
+            
+            self.strobe = not self.strobe
+            if self.strobe:
+                self.delta_e = self.delta_e_prev
+        
+            self.delta_e_prev = filtered_error * self.gain
+            self.interpolated_register = np.roll(self.interpolated_register, -1)
+            self.interpolated_register[-1] = interpolated_sample
+            return interpolated_sample
         else:
-            max_len = m
-            b = np.concatenate((b, np.zeros(m - n)))
-        denominator = a.copy()
-        denominator[1:] = -denominator[1:]
-        denominator[0] = 0
-        x = np.concatenate((x, np.zeros(max_len - 1)))
-        y = np.zeros(len(x), dtype=complex)
-        delay_line = np.zeros(max_len, dtype=complex)
-        for i, value in enumerate(x):
-            y[i] = np.dot(b, delay_line)
-            tmp = np.dot(denominator, delay_line)
-            delay_line[1:] = delay_line[:-1]
-            delay_line[0] = value * a[0] + tmp
-        return y[1:]
+            return None
 
-    def get_timing_error_record(self):
+    def farrow_interpolator_parabolic(self, input, row=0):
         """
-        Get the recorded timing errors.
+        Perform parabolic interpolation on the input signal.
+
+        :param input: Numpy array. The input signal to be interpolated.
+        :param row: Int type. The row in the delay buffers to use.
+        :return: Complex. The interpolated output sample.
+        """
+        tmp = self.delta_e
+
+        d1next = -0.5 * input
+        d2next = input
+    
+        v2 = -d1next + self.delay_register_1[2] + self.delay_register_1[1] - self.delay_register_1[0]
+        v1 = d1next - self.delay_register_1[2] + self.delay_register_2[1] + self.delay_register_1[1] + self.delay_register_1[0]
+        v0 = self.delay_register_2[0]
+        output = (((v2 * self.delta_e) + v1) * self.delta_e + v0)
+
+        self.delay_register_1 = np.roll(self.delay_register_1, -1)
+        self.delay_register_2 = np.roll(self.delay_register_2, -1)
+        self.delay_register_1[-1] = d1next
+        self.delay_register_2[-1] = d2next
+
+        self.delta_e = tmp
         
-        :return: Numpy array type. Recorded timing errors.
+        return output
+    
+    def farrow_interpolator_cubic(self, input, row=0):
         """
-        return np.array(self.timing_error_record)
+        Perform cubic interpolation on the input signal.
 
-    def get_loop_filter_record(self):
+        :param input: Numpy array. The input signal to be interpolated.
+        :param row: Int type. The row in the delay buffers to use.
+        :return: Complex. The interpolated output sample.
         """
-        Get the recorded loop filter outputs.
+        tmp = self.delta_e
+
+        d1next = input
+        d2next = input
+        v3 = (1 / 6) * d1next - (1 / 2) * self.delay_register_1[2] + (1 / 2) * self.delay_register_1[1] - (1 / 6) * self.delay_register_1[0]
+        v2 = (1 / 2) * self.delay_register_1[2] - self.delay_register_1[1] + (1 / 2) * self.delay_register_1[0]
+        v1 = (-1 / 6) * d1next + self.delay_register_1[2] - (1 / 2) * self.delay_register_1[1] - (1 / 3) * self.delay_register_1[0]
+        v0 = self.delay_register_2[0]
+        output = ((v3 * self.delta_e + v2) * self.delta_e + v1) * self.delta_e + v0
+
+        self.delay_register_1 = np.roll(self.delay_register_1, -1)
+        self.delay_register_2 = np.roll(self.delay_register_2, -1)
+        self.delay_register_1[-1] = d1next
+        self.delay_register_2[-1] = d2next
+
+        self.delta_e = tmp
         
-        :return: Numpy array type. Recorded loop filter outputs.
-        """
-        return np.array(self.loop_filter_record)
-
-    def interpolate(self, symbol_block, mode='cubic'):
-        """
-        Discrete signal upsample implementation.
-
-        :param symbol_block: List or Numpy array type. Input signal.
-        :param mode: String type. Interpolation mode ('linear' or 'cubic').
-        :return: Numpy array type. Upsampled signal.
-        """
-        if mode == "linear":
-            symbol_block_upsampled = np.zeros(len(symbol_block) * self.upsample_rate, dtype=complex)
-            for i, sample in enumerate(symbol_block):
-                symbol_block_upsampled[i * self.upsample_rate] = sample
-            nonzero_indices = np.arange(0, len(symbol_block_upsampled), self.upsample_rate)
-            nonzero_values = symbol_block_upsampled[nonzero_indices]
-            new_indices = np.arange(len(symbol_block_upsampled))
-            interpolation_function = intp.interp1d(nonzero_indices, nonzero_values, kind="linear", fill_value='extrapolate')
-            symbol_block_interpolated = interpolation_function(new_indices)
-
-        elif mode == "cubic":
-            symbol_block = np.append(symbol_block, 0)
-            interpolation_function = intp.CubicSpline(np.arange(0, len(symbol_block)), symbol_block)
-            symbol_block_interpolated = interpolation_function(np.linspace(0, len(symbol_block)-1, num=(len(symbol_block)-1) * self.upsample_rate))
-
-        else:
-            symbol_block_interpolated = symbol_block
-        return symbol_block_interpolated
-
-    def loop_filter(self, timing_error):
-        """
-        Loop filter implementation.
-        
-        :param timing_error: Float type. The current timing error.
-        :return: Float type. The output of the loop filter.
-        """
-        k2 = self.k2 * timing_error + self.k2_prev
-        output = self.k1 * timing_error + k2
-        self.k2_prev = k2
-
-        self.loop_filter_record.append(output)
         return output
 
-    def early_late_ted(self, early_sample, current_sample, late_sample):
+    def early_late_ted(self):
         """
-        Early-late Timing Error Detector (TED) implementation.
-        
-        :return: Float type. The calculated timing error.
+        Perform early-late timing error detection.
+
+        :return: Float. The calculated timing error based on early and late samples.
         """
-        timing_error = np.real(current_sample) * (np.real(late_sample) - np.real(early_sample))
-        self.timing_error_record.append(timing_error)
-        return timing_error
-
-    def insert_new_sample(self, current_complex_sample):
+        out = 0
+        if self.strobe:
+            real_est = (self.interpolated_register[2].real - self.interpolated_register[0].real) * (-1 if self.interpolated_register[1].real < 0 else 1)
+            imag_est = (self.interpolated_register[2].imag - self.interpolated_register[0].imag) * (-1 if self.interpolated_register[1].imag < 0 else 1)
+            out = real_est + imag_est
+        return out
+    
+    def loop_filter(self, phase_error, k1=None, k2=None):
         """
-        Insert new samples for processing.
+        Apply a loop filter to the phase error to compute the filtered output.
 
-        :param current_complex_sample: Complex numpy dtype. Info.
+        :param phase_error: Float type. The timing phase error to be filtered.
+        :param k1: Float type. (Optional) The proportional gain; defaults to self.k1 if None.
+        :param k2: Float type. (Optional) The integral gain; defaults to self.k2 if None.
+        :return: Float. The filtered output from the loop filter.
         """
-
-        if self.counter == self.samples_per_symbol - 1:
-            # update samples register
-            self.sample_register = self.sample_register[1:]
-            self.sample_register = np.append(self.sample_register, current_complex_sample)
-
-            corrected_symbol = 0
-
-            self.counter = 0
-            return corrected_symbol
-
-        else:
-            # update samples register
-            self.sample_register = self.sample_register[1:]
-            self.sample_register = np.append(self.sample_register, current_complex_sample)
-
-            self.counter += 1
-            return None
+        if k1 is None:
+            k1 = self.k1
+        if k2 is None:
+            k2 = self.k2
+        LFK2 = k2 * phase_error + self.LFK2_prev
+        output = k1 * phase_error + LFK2
+        self.LFK2_prev = LFK2
+        return output
