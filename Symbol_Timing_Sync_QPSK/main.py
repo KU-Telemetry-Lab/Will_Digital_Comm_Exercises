@@ -68,7 +68,7 @@ xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
 # adding header to each channel
-header = np.ones(50)
+header = [1,0] * 25
 xk = np.concatenate([header, xk])
 yk = np.concatenate([header, yk])
 
@@ -105,8 +105,8 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # INTRODUCE TIMING OFFSET
 ###################################################################################################
-timing_offset = 0
-sample_shift = 0
+timing_offset = 0.5
+sample_shift = 2
 
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
 yk_upsampled = clock_offset(yk_upsampled, fs, timing_offset)[sample_shift:]
@@ -211,7 +211,7 @@ for i in range(len(r_nT)):
     if corrected_constellation is not None:
         corrected_constellations.append(corrected_constellation)
 
-# plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
+plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
 
 
 # MAKE A DECISION FOR EACH PULSE
