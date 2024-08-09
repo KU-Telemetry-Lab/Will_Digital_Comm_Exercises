@@ -68,7 +68,7 @@ xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
 # adding header to each channel
-header = [1,0] * 25
+header = [1,0] * 50
 xk = np.concatenate([header, xk])
 yk = np.concatenate([header, yk])
 
@@ -105,8 +105,9 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # INTRODUCE TIMING OFFSET
 ###################################################################################################
-timing_offset = 0.5
-sample_shift = 2
+timing_offset = 0.9
+sample_shift = 0
+
 
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
 yk_upsampled = clock_offset(yk_upsampled, fs, timing_offset)[sample_shift:]
@@ -199,41 +200,51 @@ r_nT = (xr_nT_downsampled + 1j* yr_nT_downsampled)
 
 # SYMBOL TIMING SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = .025*fs
+loop_bandwidth = .2*fs
 damping_factor = 1/np.sqrt(2)
-scs = SCS(samples_per_symbol=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=1)
+scs = SCS(samples_per_symbol=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=800)
 
 corrected_constellations = []
 
 for i in range(len(r_nT)):
-    corrected_constellation = scs.insert_new_sample(i, r_nT[i])
+    if i % 2 == 0:
+        corrected_constellation = scs.insert_new_sample(i, r_nT[i])
 
-    if corrected_constellation is not None:
-        corrected_constellations.append(corrected_constellation)
+        if corrected_constellation is not None:
+            corrected_constellations.append(corrected_constellation)
 
 plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
 
+# # plot ted output
+# plt.figure()
+# plt.stem(scs.ted_output_record)
+# plt.grid()
+# plt.show()
 
-# MAKE A DECISION FOR EACH PULSE
-##################################################################################################
-detected_symbols = communications.nearest_neighbor(corrected_constellations, qpsk_constellation)
+# # plot ted output
+# plt.figure()
+# plt.stem(scs.loop_filter_output_record)
+# plt.grid()
+# plt.show()
 
-# removing header and adjusting for symbol timing synchronization delay
-detected_symbols = np.roll(detected_symbols[len(header):], -3)
 
-print(len(input_message_symbols))
-print(len(detected_symbols))
+# # MAKE A DECISION FOR EACH PULSE
+# ##################################################################################################
+# detected_symbols = communications.nearest_neighbor(corrected_constellations, qpsk_constellation)
 
-error_count = error_count(input_message_symbols, detected_symbols)
+# # # removing header and adjusting for symbol timing synchronization delay
+# detected_symbols = np.roll(detected_symbols[len(header):], -3)
 
-print(f"Transmission Symbol Errors: {error_count}")
-print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
+# error_count = error_count(input_message_symbols, detected_symbols)
 
-# converting symbols to binary then binary to ascii
-detected_bits = []
-for symbol in detected_symbols:
-    detected_bits += ([*bin(symbol)[2:].zfill(2)])
+# print(f"Transmission Symbol Errors: {error_count}")
+# print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
 
-message = communications.bin_to_char(detected_bits)
-print(message)
+# # converting symbols to binary then binary to ascii
+# detected_bits = []
+# for symbol in detected_symbols:
+#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
+
+# message = communications.bin_to_char(detected_bits)
+# print(message)
 

@@ -26,6 +26,9 @@ class SCS:
         self.delta_e_prev = 0
         self.LFK2_prev = 0
 
+        self.ted_output_record = []
+        self.loop_filter_output_record = []
+
     def compute_loop_constants(self, loop_bandwidth, damping_factor, k0, kp):
         """
         Compute the loop filter gains based on the loop bandwidth and damping factor.
@@ -54,26 +57,23 @@ class SCS:
         :param input_sample: Numpy array. Input samples as complex numbers.
         :return: Complex. The interpolated output sample.
         """
-        if i % 2 == 0:
-            interpolated_sample = complex(0, 0)
-            if self.mode == 'parabolic':  
-                interpolated_sample = self.farrow_interpolator_parabolic(input_sample)
-            else:  
-                interpolated_sample = self.farrow_interpolator_cubic(input_sample)
-            
-            error = self.early_late_ted()
-            filtered_error = self.loop_filter(error)
-            
-            self.strobe = not self.strobe
-            if self.strobe:
-                self.delta_e = self.delta_e_prev
+        interpolated_sample = complex(0, 0)
+        if self.mode == 'parabolic':  
+            interpolated_sample = self.farrow_interpolator_parabolic(input_sample)
+        else:  
+            interpolated_sample = self.farrow_interpolator_cubic(input_sample)
         
-            self.delta_e_prev = filtered_error * self.gain
-            self.interpolated_register = np.roll(self.interpolated_register, -1)
-            self.interpolated_register[-1] = interpolated_sample
-            return interpolated_sample
-        else:
-            return None
+        error = self.early_late_ted()
+        filtered_error = self.loop_filter(error)
+        
+        self.strobe = not self.strobe
+        if self.strobe:
+            self.delta_e = self.delta_e_prev
+    
+        self.delta_e_prev = filtered_error
+        self.interpolated_register = np.roll(self.interpolated_register, -1)
+        self.interpolated_register[-1] = interpolated_sample
+        return interpolated_sample
 
     def farrow_interpolator_parabolic(self, input, row=0):
         """
@@ -139,7 +139,8 @@ class SCS:
         if self.strobe:
             real_est = (self.interpolated_register[2].real - self.interpolated_register[0].real) * (-1 if self.interpolated_register[1].real < 0 else 1)
             imag_est = (self.interpolated_register[2].imag - self.interpolated_register[0].imag) * (-1 if self.interpolated_register[1].imag < 0 else 1)
-            out = real_est + imag_est
+            out = real_est * self.gain
+            self.ted_output_record.append(out)
         return out
     
     def loop_filter(self, phase_error, k1=None, k2=None):
@@ -158,4 +159,5 @@ class SCS:
         LFK2 = k2 * phase_error + self.LFK2_prev
         output = k1 * phase_error + LFK2
         self.LFK2_prev = LFK2
+        self.loop_filter_output_record.append(output)
         return output
