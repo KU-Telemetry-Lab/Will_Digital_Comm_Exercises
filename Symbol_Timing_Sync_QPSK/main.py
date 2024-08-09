@@ -105,8 +105,8 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # INTRODUCE TIMING OFFSET
 ###################################################################################################
-timing_offset = 0
-sample_shift = 0
+timing_offset = 0.2
+sample_shift = 1
 
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
 yk_upsampled = clock_offset(yk_upsampled, fs, timing_offset)[sample_shift:]
@@ -203,19 +203,13 @@ plot_complex_points(r_nT, constellation=qpsk_constellation)
 loop_bandwidth = (fc/fs)*0.2
 damping_factor = 1/np.sqrt(2)
 
-scs = SCS2(loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, sampsPerSym=2, kp=30)
+scs = SCS2(loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, sampsPerSym=2, kp=20)
 corrected_constellations = []
-
-maxt = 0
 
 for i in range(len(r_nT)):
     corrected_constellation = scs.insert_new_sample(r_nT[i])
     if scs.strobe:
         corrected_constellations.append(corrected_constellation)
 
-    if scs.probe > maxt:
-        maxt = scs.probe
-
-print(maxt)
 plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
 
