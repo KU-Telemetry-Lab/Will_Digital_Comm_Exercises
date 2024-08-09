@@ -7,7 +7,8 @@ import sys
 sys.path.insert(0, '../KUSignalLib/src')
 from KUSignalLib import DSP
 from KUSignalLib import communications
-from SCS import SCS
+# from SCS import SCS
+from SCS2 import SCS2
 
 def string_to_ascii_binary(string, num_bits=7):
     return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
@@ -105,9 +106,8 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # INTRODUCE TIMING OFFSET
 ###################################################################################################
-timing_offset = 0.9
+timing_offset = 0
 sample_shift = 0
-
 
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
 yk_upsampled = clock_offset(yk_upsampled, fs, timing_offset)[sample_shift:]
@@ -140,7 +140,7 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 
 # DIGITAL MODULATION
 ##################################################################################################
-s_RF = (
+s_rf = (
     np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc, fs)) +
     np.sqrt(2) * np.imag(DSP.modulate_by_exponential(yk_pulse_shaped, fc, fs))
 )
@@ -156,8 +156,8 @@ s_RF = (
 
 # DIGITAL DEMODULATIOIN
 ##################################################################################################
-xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_RF, fc, fs))
-yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
+xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_rf, fc, fs))
+yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_rf, fc, fs))
 
 # # plot demodulated signal
 # plt.figure()
@@ -197,28 +197,37 @@ r_nT = (xr_nT_downsampled + 1j* yr_nT_downsampled)
 # plt.ylabel("Amplutide [V]")
 # plt.show()
 
+plot_complex_points(r_nT, constellation=qpsk_constellation)
+
 
 # SYMBOL TIMING SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = .2*fs
+loop_bandwidth = (fc/fs)*0.2
 damping_factor = 1/np.sqrt(2)
-scs = SCS(samples_per_symbol=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=800)
-
+# scs = SCS(samples_per_symbol=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=800)
+scs = SCS2(loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, sampsPerSym=2, kp = 25.22, gain=.01)
 corrected_constellations = []
-
+maxt = 0
 for i in range(len(r_nT)):
-    if i % 2 == 0:
-        corrected_constellation = scs.insert_new_sample(i, r_nT[i])
 
-        if corrected_constellation is not None:
-            corrected_constellations.append(corrected_constellation)
+    corrected_constellation = scs.insert_new_sample(r_nT[i], parabolic=False)
+
+    # if abs(scs.delta_e) > maxt:
+    #     maxt = abs(scs.delta_e)
+    if scs.strobe:
+        corrected_constellations.append(corrected_constellation)
+
+# print(maxt)
+# DEBUGGING !!!
+print(len(xk))
+print(len(corrected_constellations))
 
 plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
 
 # # plot ted output
 # plt.figure()
 # plt.stem(scs.ted_output_record)
-# plt.grid()
+# plt.grid()  
 # plt.show()
 
 # # plot ted output
@@ -228,23 +237,23 @@ plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
 # plt.show()
 
 
-# # MAKE A DECISION FOR EACH PULSE
-# ##################################################################################################
-# detected_symbols = communications.nearest_neighbor(corrected_constellations, qpsk_constellation)
+# MAKE A DECISION FOR EACH PULSE
+##################################################################################################
+detected_symbols = communications.nearest_neighbor(corrected_constellations, qpsk_constellation)
 
-# # # removing header and adjusting for symbol timing synchronization delay
-# detected_symbols = np.roll(detected_symbols[len(header):], -3)
+# # removing header and adjusting for symbol timing synchronization delay
+detected_symbols = np.roll(detected_symbols[len(header):], -0)
 
-# error_count = error_count(input_message_symbols, detected_symbols)
+error_count = error_count(input_message_symbols, detected_symbols)
 
-# print(f"Transmission Symbol Errors: {error_count}")
-# print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
+print(f"Transmission Symbol Errors: {error_count}")
+print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
 
-# # converting symbols to binary then binary to ascii
-# detected_bits = []
-# for symbol in detected_symbols:
-#     detected_bits += ([*bin(symbol)[2:].zfill(2)])
+# converting symbols to binary then binary to ascii
+detected_bits = []
+for symbol in detected_symbols:
+    detected_bits += ([*bin(symbol)[2:].zfill(2)])
 
-# message = communications.bin_to_char(detected_bits)
-# print(message)
+message = communications.bin_to_char(detected_bits)
+print(message)
 

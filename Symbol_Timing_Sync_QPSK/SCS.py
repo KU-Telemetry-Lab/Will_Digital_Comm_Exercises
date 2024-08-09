@@ -29,6 +29,8 @@ class SCS:
         self.ted_output_record = []
         self.loop_filter_output_record = []
 
+        self.debugging_flag = False
+
     def compute_loop_constants(self, loop_bandwidth, damping_factor, k0, kp):
         """
         Compute the loop filter gains based on the loop bandwidth and damping factor.
@@ -73,20 +75,27 @@ class SCS:
         self.delta_e_prev = filtered_error
         self.interpolated_register = np.roll(self.interpolated_register, -1)
         self.interpolated_register[-1] = interpolated_sample
+
+        # if self.debugging_flag == False:
+        #     print(interpolated_sample)
+        #     print(input_sample)
+        #     print(self.interpolated_register)
+        #     self.debugging_flag = True
+
         return interpolated_sample
 
-    def farrow_interpolator_parabolic(self, input, row=0):
+    def farrow_interpolator_parabolic(self, input_sample, row=0):
         """
         Perform parabolic interpolation on the input signal.
 
-        :param input: Numpy array. The input signal to be interpolated.
+        :param input_sample: Numpy array. The input signal to be interpolated.
         :param row: Int type. The row in the delay buffers to use.
         :return: Complex. The interpolated output sample.
         """
         tmp = self.delta_e
 
-        d1next = -0.5 * input
-        d2next = input
+        d1next = -0.5 * input_sample
+        d2next = input_sample
     
         v2 = -d1next + self.delay_register_1[2] + self.delay_register_1[1] - self.delay_register_1[0]
         v1 = d1next - self.delay_register_1[2] + self.delay_register_2[1] + self.delay_register_1[1] + self.delay_register_1[0]
@@ -102,7 +111,7 @@ class SCS:
         
         return output
     
-    def farrow_interpolator_cubic(self, input, row=0):
+    def farrow_interpolator_cubic(self, input_sample, row=0):
         """
         Perform cubic interpolation on the input signal.
 
@@ -112,8 +121,8 @@ class SCS:
         """
         tmp = self.delta_e
 
-        d1next = input
-        d2next = input
+        d1next = input_sample
+        d2next = input_sample
         v3 = (1 / 6) * d1next - (1 / 2) * self.delay_register_1[2] + (1 / 2) * self.delay_register_1[1] - (1 / 6) * self.delay_register_1[0]
         v2 = (1 / 2) * self.delay_register_1[2] - self.delay_register_1[1] + (1 / 2) * self.delay_register_1[0]
         v1 = (-1 / 6) * d1next + self.delay_register_1[2] - (1 / 2) * self.delay_register_1[1] - (1 / 3) * self.delay_register_1[0]
