@@ -18,7 +18,7 @@ class SCS:
 
         self.delay_register_1 = np.zeros(3, dtype=complex)
         self.delay_register_2 = np.zeros(3, dtype=complex)
-        self.interpolated_register = np.zeros(3, dtype=complex)
+        self.interpolation_register = np.zeros(3, dtype=complex)
 
         self.LFK2_prev = 0
         self.decrementor_prev = 0
@@ -78,8 +78,8 @@ class SCS:
             self.mu = self.decrementor_prev / w_n
     
         # update interpolation register (shift)
-        self.interpolated_register = np.roll(self.interpolated_register, -1)
-        self.interpolated_register[-1] = interpolated_sample
+        self.interpolation_register = np.roll(self.interpolation_register, -1)
+        self.interpolation_register[-1] = interpolated_sample
 
         # store decrementor value
         self.decrementor_prev = decrementor
@@ -121,8 +121,8 @@ class SCS:
         """
         out = 0
         if self.strobe:
-            real_est = (np.real(self.interpolated_register[2]) - np.real(self.interpolated_register[0])) * (-1 if np.real(self.interpolated_register[1]) < 0 else 1)
-            imag_est = (np.imag(self.interpolated_register[2]) - np.imag(self.interpolated_register[0])) * (-1 if np.imag(self.interpolated_register[1]) < 0 else 1)
+            real_est = (np.real(self.interpolation_register[2]) - np.real(self.interpolation_register[0])) * (-1 if np.real(self.interpolation_register[1]) < 0 else 1)
+            imag_est = (np.imag(self.interpolation_register[2]) - np.imag(self.interpolation_register[0])) * (-1 if np.imag(self.interpolation_register[1]) < 0 else 1)
             out = real_est
             self.ted_output_record.append(out)
         return out
