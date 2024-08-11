@@ -14,7 +14,14 @@ def string_to_ascii_binary(string, num_bits=7):
     return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
 
 def error_count(x, y):
-    return sum(1 for i in range(len(x)) if x[i] != y[i])
+    # Make the lengths of x and y equal by appending zeros to the shorter one
+    max_len = max(len(x), len(y))
+    x = x + [0] * (max_len - len(x))
+    y = y + [0] * (max_len - len(y))
+    
+    # Count errors
+    return sum(1 for i in range(max_len) if x[i] != y[i])
+
 
 def clock_offset(signal, sample_rate, offset_fraction):
     t = np.arange(0, len(signal) / sample_rate, 1 / sample_rate)
@@ -106,7 +113,7 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # INTRODUCE TIMING OFFSET
 ###################################################################################################
-timing_offset = 0.4
+timing_offset = 0.5
 sample_shift = 0
 
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
@@ -205,22 +212,33 @@ r_nT = (xr_nT_downsampled + 1j* yr_nT_downsampled)
 loop_bandwidth = (fc/fs)*0.03
 damping_factor = 1/np.sqrt(2)
 
-scs = SCS(samples_per_symbol=2, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=100)
+# # measuring scs system gain
+# scs = SCS(samples_per_symbol=2, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, open_loop=True)
 
+# max_lf_output = 0
+# for i in range(len(r_nT)):
+#     lf_output = scs.insert_new_sample(r_nT[i])
+#     if lf_output > max_lf_output:
+#         max_lf_output = lf_output
+
+# print(f"\nSCS Measured System Gain: {1/max_lf_output}\n")
+
+# running scs system
+scs = SCS(samples_per_symbol=2, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=42)
 corrected_constellations = []
 for i in range(len(r_nT)):
     corrected_constellation = scs.insert_new_sample(r_nT[i])
     if corrected_constellation is not None:
         corrected_constellations.append(corrected_constellation)
 
-plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
+# plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
 
 # MAKE A DECISION FOR EACH PULSE
 ##################################################################################################
 detected_symbols = communications.nearest_neighbor(corrected_constellations, qpsk_constellation)
 
 # removing header and adjusting for symbol timing synchronization delay
-detected_symbols = np.roll(detected_symbols[len(header):], -2)
+detected_symbols = detected_symbols[len(header)+2:]
 
 error_count = error_count(input_message_symbols, detected_symbols)
 

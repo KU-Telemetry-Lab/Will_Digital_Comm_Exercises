@@ -1,7 +1,7 @@
 import numpy as np
 
 class SCS:
-    def __init__(self, samples_per_symbol, loop_bandwidth, damping_factor, gain=1):
+    def __init__(self, samples_per_symbol, loop_bandwidth, damping_factor, gain=1, open_loop=False):
         '''
         Initialize the SCS (Symbol Clock Synchronization) subsystem class.
 
@@ -12,7 +12,7 @@ class SCS:
         '''
         self.samples_per_symbol = samples_per_symbol
         self.gain = gain
-        self.strobe = None
+        self.open_loop = open_loop
 
         self.compute_loop_constants(loop_bandwidth, damping_factor, samples_per_symbol)
 
@@ -20,14 +20,13 @@ class SCS:
         self.delay_register_2 = np.zeros(3, dtype=complex)
         self.interpolation_register = np.zeros(3, dtype=complex)
 
+        self.strobe = None
         self.LFK2_prev = 0
         self.decrementor_prev = 0
         self.mu = 0
 
         self.ted_output_record = []
         self.loop_filter_output_record = []
-
-        self.gain_probe = 0
 
     def compute_loop_constants(self, loop_bandwidth, damping_factor, samples_per_symbol):
         """
@@ -54,11 +53,9 @@ class SCS:
         
         # timing error detector
         error = self.early_late_ted()
+
         # loop filter
         filtered_error = self.loop_filter(error)
-        # normalize loop filter output gain
-        if self.gain_probe < filtered_error:
-            self.gain_probe = filtered_error
 
         # calculate w(n)
         w_n = filtered_error + (1 / self.samples_per_symbol)
@@ -84,10 +81,13 @@ class SCS:
         # store decrementor value
         self.decrementor_prev = decrementor
 
-        if self.strobe:
-            return interpolated_sample
+        if self.open_loop == False:
+            if self.strobe:
+                return interpolated_sample
+            else:
+                return None
         else:
-            return None
+            return filtered_error
 
     def farrow_interpolator_parabolic(self, input_sample):
         """
