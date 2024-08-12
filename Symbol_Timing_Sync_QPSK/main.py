@@ -8,18 +8,14 @@ sys.path.insert(0, '../KUSignalLib/src')
 from KUSignalLib import DSP
 from KUSignalLib import communications
 from SCS import SCS
-# from SCS2 import SCS
 
 def string_to_ascii_binary(string, num_bits=7):
     return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
 
 def error_count(x, y):
-    # Make the lengths of x and y equal by appending zeros to the shorter one
     max_len = max(len(x), len(y))
     x = x + [0] * (max_len - len(x))
     y = y + [0] * (max_len - len(y))
-    
-    # Count errors
     return sum(1 for i in range(max_len) if x[i] != y[i])
 
 
@@ -113,7 +109,7 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # INTRODUCE TIMING OFFSET
 ###################################################################################################
-timing_offset = 0.5
+timing_offset = 0.0
 sample_shift = 0
 
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
@@ -138,11 +134,11 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 # plt.title("Pulse Shaped Signal")
 # plt.xlabel("Sample Time [n]")
 # plt.ylabel("Amplutide [V]")
+# plt.show()
 
 # print(f"\nFilter Length: {length} samples")
 # print(f"Message Length: {alpha} percent")
 # print(f"Sample Rate: {fs} samples per symbol\n")
-# plt.show()
 
 
 # DIGITAL MODULATION
@@ -154,7 +150,7 @@ s_rf = (
 
 # # plot modulated RF signal
 # plt.figure()
-# plt.stem(s_RF[len(header)*fs:(len(header)+5)*fs])
+# plt.stem(s_rf[len(header)*fs:(len(header)+5)*fs])
 # plt.title("Modulated Signal")
 # plt.xlabel("Sample Time [n]")
 # plt.ylabel("Amplutide [V]")
@@ -179,7 +175,6 @@ yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_rf, fc, fs))
 ##################################################################################################
 xr_nT_match_filtered = np.real(np.roll(DSP.convolve(xr_nT, pulse_shape, mode="same"), -1))
 yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="same"), -1))
-r_nT = xr_nT_match_filtered + 1j * yr_nT_match_filtered
 
 # # plot match filtered signal
 # plt.figure()
@@ -212,19 +207,20 @@ r_nT = (xr_nT_downsampled + 1j* yr_nT_downsampled)
 loop_bandwidth = (fc/fs)*0.03
 damping_factor = 1/np.sqrt(2)
 
-# # measuring scs system gain
-# scs = SCS(samples_per_symbol=2, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, open_loop=True)
+# measuring scs system gain
+scs = SCS(samples_per_symbol=2, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, open_loop=True)
 
-# max_lf_output = 0
-# for i in range(len(r_nT)):
-#     lf_output = scs.insert_new_sample(r_nT[i])
-#     if lf_output > max_lf_output:
-#         max_lf_output = lf_output
+max_lf_output = 0
+for i in range(len(r_nT)):
+    lf_output = scs.insert_new_sample(r_nT[i])
+    if lf_output > max_lf_output:
+        max_lf_output = lf_output
 
-# print(f"\nSCS Measured System Gain: {1/max_lf_output}\n")
+scs_gain = 1/max_lf_output
+print(f"\nSCS Measured System Gain: {1/max_lf_output}\n")
 
 # running scs system
-scs = SCS(samples_per_symbol=2, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=42)
+scs = SCS(samples_per_symbol=2, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=scs_gain)
 corrected_constellations = []
 for i in range(len(r_nT)):
     corrected_constellation = scs.insert_new_sample(r_nT[i])
@@ -235,11 +231,10 @@ for i in range(len(r_nT)):
 
 # MAKE A DECISION FOR EACH PULSE
 ##################################################################################################
-detected_symbols = communications.nearest_neighbor(corrected_constellations, qpsk_constellation)
+detected_symbols = communications.nearest_neighbor(corrected_constellations[len(header):], qpsk_constellation)
 
-# removing header and adjusting for symbol timing synchronization delay
-detected_symbols = detected_symbols[len(header)+2:]
-
+# adjusting for symbol timing synchronization delay
+detected_symbols = detected_symbols[2:]
 error_count = error_count(input_message_symbols, detected_symbols)
 
 print(f"Transmission Symbol Errors: {error_count}")

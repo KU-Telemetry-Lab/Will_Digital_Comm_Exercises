@@ -23,7 +23,10 @@ def string_to_ascii_binary(string, num_bits=7):
     return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
 
 def error_count(x, y):
-    return sum(1 for i in range(len(x)) if x[i] != y[i])
+    max_len = max(len(x), len(y))
+    x = x + [0] * (max_len - len(x))
+    y = y + [0] * (max_len - len(y))
+    return sum(1 for i in range(max_len) if x[i] != y[i])
 
 def clock_offset(signal, sample_rate, offset_fraction):
     t = np.arange(0, len(signal) / sample_rate, 1 / sample_rate)
@@ -48,7 +51,6 @@ def plot_complex_points(complex_array, constellation):
     plt.axis('equal')
     plt.legend()
     plt.show()
-
 
 
 # SYSTEM PARAMETERS
@@ -90,7 +92,7 @@ xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
 # adding header to each channel
-header = [1,0] * 25
+header = [1,0] * 50
 xk = np.concatenate([header, xk])
 yk = np.concatenate([header, yk])
 
@@ -115,7 +117,7 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # # plot upsampled symbols
 # plt.figure()
-# plt.stem(yk_upsampled[len(header)*fs:(len(header)+5)*fs])
+# plt.stem(yk_upsampled[(len(header)+len(unique_word))*fs:(len(header)+len(unique_word)+5)*fs])
 # plt.title("Upsampled Symbols")
 # plt.xlabel("Sample Time [n]")
 # plt.ylabel("Amplutide [V]")
@@ -124,7 +126,7 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
 # INTRODUCE TIMING OFFSET
 ###################################################################################################
-timing_offset = 0
+timing_offset = 0.0
 sample_shift = 0
 
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
@@ -145,31 +147,31 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 
 # # plot pulse shaped signal
 # plt.figure()
-# plt.stem(yk_pulse_shaped[len(header)*fs:(len(header)+5)*fs])
+# plt.stem(yk_pulse_shaped[(len(header)+len(unique_word))*fs:(len(header)+len(unique_word)+5)*fs])
 # plt.title("Pulse Shaped Signal")
 # plt.xlabel("Sample Time [n]")
 # plt.ylabel("Amplutide [V]")
+# plt.show()
 
 # print(f"\nFilter Length: {length} samples")
 # print(f"Message Length: {alpha} percent")
 # print(f"Sample Rate: {fs} samples per symbol\n")
-# plt.show()
 
 
 # DIGITAL MODULATION
 ##################################################################################################
 # synchronization offsets
 fc_offset = 0.0
-phase_offset = np.pi/5
+phase_offset = 0
 
-s_RF = (
+s_rf = (
     np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc + fc_offset, fs)) +
     np.sqrt(2) * np.imag(DSP.modulate_by_exponential(yk_pulse_shaped, fc + fc_offset, fs))
 ) * np.exp(1j * phase_offset)
 
 # # plot modulated RF signal
 # plt.figure()
-# plt.stem(s_RF[len(header)*fs:(len(header)+5)*fs])
+# plt.stem(s_rf[(len(header)+len(unique_word))*fs:(len(header)+len(unique_word)+5)*fs])
 # plt.title("Modulated Signal")
 # plt.xlabel("Sample Time [n]")
 # plt.ylabel("Amplutide [V]")
@@ -178,12 +180,12 @@ s_RF = (
 
 # DIGITAL DEMODULATIOIN
 ##################################################################################################
-xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_RF, fc, fs))
-yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
+xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_rf, fc, fs))
+yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_rf, fc, fs))
 
 # # plot demodulated signal
 # plt.figure()
-# plt.stem(yr_nT[len(header)*fs:(len(header)+5)*fs])
+# plt.stem(yr_nT[(len(header)+len(unique_word))*fs:(len(header)+len(unique_word)+5)*fs])
 # plt.title("Demodulated Signal")
 # plt.xlabel("Sample Time [n]")
 # plt.ylabel("Amplutide [V]")
@@ -197,7 +199,7 @@ yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="sa
 
 # # plot match filtered signal
 # plt.figure()
-# plt.stem(yr_nT_match_filtered[len(header)*fs:(len(header)+5)*fs])
+# plt.stem(yr_nT_match_filtered[(len(header)+len(unique_word))*fs:(len(header)+len(unique_word)+5)*fs])
 # plt.title("Match Filtered Signal")
 # plt.xlabel("Sample Time [n]")
 # plt.ylabel("Amplutide [V]")
@@ -212,18 +214,13 @@ r_nT = (xr_nT_downsampled + 1j* yr_nT_downsampled)
 
 # # plot downsampled by N/2 signal
 # plt.figure()
-# plt.stem(yr_nT_downsampled[len(header)*2:(len(header)+5)*2])
+# plt.stem(yr_nT_downsampled[(len(header)+len(unique_word))*2:(len(header)+len(unique_word)+5)*2])
 # plt.title("Downsampled by N/2 Signal")
 # plt.xlabel("Sample Time [n]")
 # plt.ylabel("Amplutide [V]")
 # plt.show()
 
-
-# SYMBOL TIMING SYNCHRONIZATION
-##################################################################################################
-loop_bandwidth = 0.01*fs
-damping_factor = 1/np.sqrt(2)
-scs = SCS(samples_per_symbol=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=1)
+# plot_complex_points(r_nT, constellation=qpsk_constellation)
 
 
 # UNIQUE WORD RESOLUTION
@@ -240,83 +237,122 @@ uw_flag = False
 uw_offset = 0
 
 
-# CARRIER PHASE SYNCHRONIZATION
+# SPECIFYING PLL AND SCS SYSTEM 
 ##################################################################################################
-loop_bandwidth = 10*fs
-damping_factor = 1/np.sqrt(2)
-pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
+pll_loop_bandwidth = (fc/fs) * 0.2
+pll_damping_factor = 1/np.sqrt(2)
 
-pll_detected_phase_record = []
-pll_error_record = []
-pll_loop_filter_record = []
+scs_loop_bandwidth = (fc/fs) * 0.03
+scs_damping_factor = 1/np.sqrt(2)
 
-rotated_constellations = []
+
+# MEASURING PLL AND SCS SYSTEM GAIN
+##################################################################################################
+pll = PLL(sample_rate=2, loop_bandwidth=pll_loop_bandwidth, damping_factor=pll_damping_factor, open_loop=True)
+scs = SCS(samples_per_symbol=2, loop_bandwidth=scs_loop_bandwidth, damping_factor=scs_damping_factor, open_loop=True)
+
+pll_max_lf_output = 0
+scs_max_lf_output = 0
+for i in range(len(r_nT)):
+    pll_lf_output = pll.insert_new_sample(r_nT[i], i)
+    scs_lf_output = scs.insert_new_sample(r_nT[i])
+
+    if pll_lf_output > pll_max_lf_output:
+        pll_max_lf_output = pll_lf_output
+
+    if scs_lf_output > scs_max_lf_output:
+        scs_max_lf_output = scs_lf_output
+
+pll_gain = pll_max_lf_output
+scs_gain = 1/scs_max_lf_output
+
+# print(f"\nPLL Measured System Gain: {pll_gain}\n")
+# print(f"\nSCS Measured System Gain: {scs_gain}\n")
+
+
+# RUNNING PLL AND SCS SYSTEMS
+##################################################################################################
+pll = PLL(sample_rate=2, loop_bandwidth=pll_loop_bandwidth, damping_factor=pll_damping_factor, gain=pll_gain)
+scs = SCS(samples_per_symbol=2, loop_bandwidth=scs_loop_bandwidth, damping_factor=scs_damping_factor, gain=scs_gain, invert=True)
+
 detected_constellations = []
+rotated_corrected_constellations = []
+pll_error_record = []
 
-dds_output = np.exp(1j * 0)
+dds_output = np.exp(1j * 0) # initial pll rotation
 
 for i in range(len(r_nT)):
-    if i % 2 == 0:
-        # perform ccw rotation
-        rk_ccwr = r_nT[i] * dds_output * np.exp(1j * uw_offset)
-        rotated_constellations.append(rk_ccwr)
+    # perform ccw rotation
+    r_nT_ccwr = r_nT[i] * dds_output * np.exp(1j * uw_offset)
 
-        # scs clock offset correction
-        corrected_constellation = scs.insert_new_sample(r_nT[i])
+    # correct clock offset
+    corrected_constellation = scs.insert_new_sample(r_nT_ccwr)
+    if corrected_constellation is not None:
+        rotated_corrected_constellations.append(corrected_constellation)
 
-        # find nearest neighbor constellation
+        # phase error calculation
         detected_symbol = communications.nearest_neighbor([corrected_constellation], qpsk_constellation)[0]
         detected_constellation = bits_to_amplitude[detected_symbol]
         detected_constellations.append(detected_constellation)
-
-        # update unique word register
+        
+        # update unquie word register
         uw_register.pop(0)
         uw_register.append(str(detected_symbol))
 
         if uw_flag == False:
             received_unique_word = check_unique_word(uw_register)
-            if received_unique_word != None:
+            if received_unique_word is not None:
                 uw_offset = received_unique_word
                 uw_flag = True
-
-        # calculate phase error
-        phase_error = pll.phase_detector(rk_ccwr, detected_constellation)
-        pll_error_record.append(phase_error)
         
+        # calculating phase error
+        phase_error = pll.phase_detector(corrected_constellation, detected_constellation)
+        pll_error_record.append(phase_error)
+
         # feed into loop filter
         loop_filter_output = pll.loop_filter(phase_error)
-        pll_error_record.append(loop_filter_output)
 
         # generate next dds output
         dds_output = np.exp(1j * loop_filter_output)
 
-print(f"Phase Ambiguity Rotation: {np.degrees(uw_offset)} deg\n")
+# print(f"Phase Ambiguity Rotation: {np.degrees(uw_offset)} deg\n")
+# plt.figure()
+# plt.plot(pll_error_record, label='Phase Error', color='r')
+# plt.title('Phase Error')
+# plt.xlabel('Sample Index')
+# plt.ylabel('Phase Error (radians)')
+# plt.grid()
+# plt.show()
 
-# phase error and constellation plotting
-plt.figure()
-plt.plot(pll_error_record, label='Phase Error', color='r')
-plt.title('Phase Error')
-plt.xlabel('Sample Index')
-plt.ylabel('Phase Error (radians)')
-plt.grid()
-plt.show()
-
-plt.title("PLL Output Constellations")
-plt.plot(np.real(rotated_constellations), np.imag(rotated_constellations), 'ro', label="Rotated Constellations")
-plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo',  label="Esteimated Constellations")
-plt.legend()
-plt.grid(True)
-plt.show()
-
-
+# plt.title("PLL Output Constellations")
+# plt.plot(np.real(rotated_corrected_constellations), np.imag(rotated_corrected_constellations), 'ro', label="Rotated Constellations")
+# plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo',  label="Esteimated Constellations")
+# plt.legend()
+# plt.grid(True)
+# plt.show()
 
 # MAKE A DECISION FOR EACH PULSE
 ##################################################################################################
-detected_symbols = communications.nearest_neighbor(detected_constellations, qpsk_constellation)
 
-# removing header and adjusting for symbol timing synchronization delay
-detected_symbols = np.roll(detected_symbols[len(header) + len(unique_word):], -3)
+# # DEBUGGIN !!!
+# detected_symbols = communications.nearest_neighbor(detected_constellations, qpsk_constellation)
 
+# min_error_count = 1000
+# min_i = 0
+# for i in range(len(detected_symbols)):
+#     count = error_count(input_message_symbols[len(unique_word):], detected_symbols[i:])
+#     if count < min_error_count:
+#         min_error_count = count
+#         min_i = i
+
+# print(min_error_count)
+# print(min_i)
+
+detected_symbols = communications.nearest_neighbor(detected_constellations[len(header)+len(unique_word):], qpsk_constellation)
+
+
+# adjusting for symbol timing synchronization delay
+detected_symbols = detected_symbols[1:]
 error_count = error_count(input_message_symbols[len(unique_word):], detected_symbols)
 
 print(f"Transmission Symbol Errors: {error_count}")

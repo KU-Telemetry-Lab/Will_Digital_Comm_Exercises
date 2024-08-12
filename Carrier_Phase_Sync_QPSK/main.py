@@ -118,8 +118,8 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 # DIGITAL MODULATION
 ##################################################################################################
 # synchronization offsets
-fc_offset = 0.0
-phase_offset = 0
+fc_offset = 0.01
+phase_offset = np.pi
 
 s_RF = (
     np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc + fc_offset, fs)) +
@@ -190,7 +190,20 @@ uw_offset = 0
 ##################################################################################################
 loop_bandwidth = (fc/fs)*0.2
 damping_factor = 1/np.sqrt(2)
-pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
+
+# # measuring pll system gain
+# pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, open_loop=True)
+
+# max_lf_output = 0
+# for i in range(len(rk)):
+#     lf_output = pll.insert_new_sample(rk[i], i)
+#     if lf_output > max_lf_output:
+#         max_lf_output = lf_output
+
+# print(f"\nPLL Measured System Gain: {max_lf_output}\n")
+
+# running pll system
+pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=5.42)
 
 pll_detected_phase_record = []
 pll_error_record = []
@@ -227,7 +240,6 @@ for i in range(len(rk)):
     
     # feed into loop filter
     loop_filter_output = pll.loop_filter(phase_error)
-    pll_error_record.append(loop_filter_output)
 
     # generate next dds output
     dds_output = np.exp(1j * loop_filter_output)

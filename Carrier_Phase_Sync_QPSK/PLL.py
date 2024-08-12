@@ -10,7 +10,7 @@ class PLL():
     phase = 0
     dds_output = 0
 
-    def __init__(self, sample_rate, loop_bandwidth=None, damping_factor=None, gain=1, w0=1):
+    def __init__(self, sample_rate, loop_bandwidth=None, damping_factor=None, gain=1, open_loop=False):
         '''
         Initialize the PLL object with the specified parameters.
 
@@ -18,28 +18,28 @@ class PLL():
         :param loop_bandwidth: Float type, optional. Loop bandwidth. If specified with damping factor, will compute loop filter gains.
         :param damping_factor: Float type, optional. Damping factor. If specified with loop bandwidth, will compute loop filter gains.
         '''
-        self.w = 1
+        self.gain = gain
+        self.open_loop = open_loop
+        self.compute_loop_constants(sample_rate, loop_bandwidth, damping_factor)
+
+        self.omega = 1
         self.phase = 0
         self.dds_output = np.exp(1j * 0)
         self.sample_rate = sample_rate
 
-        self.compute_loop_constants(sample_rate, loop_bandwidth, damping_factor)
-        self.gain = gain
-
-    def compute_loop_constants(self, fs, lb, df):
+    def compute_loop_constants(self, loop_bandwidth, damping_factor, samples_per_symbol):
         """
-        Compute the loop filter constants based on the given parameters.
+        Compute the loop filter gains based on the loop bandwidth and damping factor.
 
-        :param fs: Float type. Sampling frequency.
-        :param lb: Float type. Loop bandwidth.
-        :param df: Float type. Damping factor.
-
-        Calculates and sets the loop filter gains K0, K1, and K2.
+        :param loop_bandwidth: Float type. Loop bandwidth of control loop.
+        :param damping_factor: Float type. Damping factor of control loop.
+        :param samples_per_symbol: Float type. Number of samples per symbol.
+        :param kp: Float type. Proportional loop filter gain.
         """
-        denominator = 1 + ((2 * df) * ((lb * (1 / fs)) / (df + (1 / (4 * df))))) + ((lb * (1 / fs)) / (df + (1 / (4 * df)))) ** 2
-        self.k1 = ((4 * df) * ((lb * (1 / fs)) / (df + (1 / (4 * df))))) / denominator
-        self.k2 = (((lb * (1 / fs)) / (df + (1 / (4 * df)))) ** 2) / denominator
-        self.k0 = 1
+        theta_n = (loop_bandwidth/samples_per_symbol)/(damping_factor + 1/(4*damping_factor))
+        factor = (4*theta_n)/(1+2*damping_factor*theta_n+theta_n**2)
+        self.k1 = damping_factor * factor/self.gain
+        self.k2 = theta_n * factor/self.gain
 
     def insert_new_sample(self, incomingSignal, n, internalSignal=None):
         """
@@ -54,11 +54,14 @@ class PLL():
         If using as an object, this is the index of the only function you need to call to achieve PLL functionality.
         """
         if internalSignal is None:
-            internalSignal = np.exp(1j * (2 * np.pi * (self.w / self.sample_rate) * n + self.phase))
+            internalSignal = np.exp(1j * (2 * np.pi * (self.omega / self.sample_rate) * n + self.phase))
         phaseError = self.phase_detector(internalSignal, incomingSignal)
         V_t = self.loop_filter(phaseError)
         pointOut = self.DDS(n, V_t)
-        return pointOut
+        if self.open_loop == False:
+            return pointOut
+        else:
+            return V_t
 
     def phase_detector(self, sample_1, sample_2):
         """
@@ -69,12 +72,12 @@ class PLL():
         :return: Float type. The phase difference between the two samples, scaled by Kp.
         """
 
-        angle = np.angle(sample2) - np.angle(sample1)
+        angle = np.angle(sample_2) - np.angle(sample_1)
         if angle > np.pi:
             angle -= 2 * np.pi
         elif angle < -np.pi:
-            angle += 2 * np.pi-
-        return angle * self.gain
+            angle += 2 * np.pi
+        return angle
 
     def loop_filter(self, phase_error):
         """
@@ -100,8 +103,8 @@ class PLL():
 
         Updates internal phase and returns the synthesized signal.
         """
-        self.phase += v * self.k0
-        self.dds_output = np.exp(1j * (2 * np.pi * (self.w0 / fs) * n + self.phase))
+        self.phase += v
+        self.dds_output = np.exp(1j * (2 * np.pi * (self.omega / self.sample_rate) * n + self.phase))
         return self.dds_output
     
     def get_current_phase(self):
