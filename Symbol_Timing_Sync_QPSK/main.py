@@ -235,8 +235,8 @@ detected_symbols = communications.nearest_neighbor(corrected_constellations[len(
 
 # adjusting for symbol timing synchronization delay
 detected_symbols = detected_symbols[2:]
-error_count = error_count(input_message_symbols, detected_symbols)
 
+error_count = error_count(input_message_symbols, detected_symbols)
 print(f"Transmission Symbol Errors: {error_count}")
 print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
 

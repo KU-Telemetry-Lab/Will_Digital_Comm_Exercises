@@ -333,28 +333,12 @@ for i in range(len(r_nT)):
 
 # MAKE A DECISION FOR EACH PULSE
 ##################################################################################################
-
-# # DEBUGGIN !!!
-# detected_symbols = communications.nearest_neighbor(detected_constellations, qpsk_constellation)
-
-# min_error_count = 1000
-# min_i = 0
-# for i in range(len(detected_symbols)):
-#     count = error_count(input_message_symbols[len(unique_word):], detected_symbols[i:])
-#     if count < min_error_count:
-#         min_error_count = count
-#         min_i = i
-
-# print(min_error_count)
-# print(min_i)
-
 detected_symbols = communications.nearest_neighbor(detected_constellations[len(header)+len(unique_word):], qpsk_constellation)
-
 
 # adjusting for symbol timing synchronization delay
 detected_symbols = detected_symbols[1:]
-error_count = error_count(input_message_symbols[len(unique_word):], detected_symbols)
 
+error_count = error_count(input_message_symbols[len(unique_word):], detected_symbols)
 print(f"Transmission Symbol Errors: {error_count}")
 print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
 
