@@ -214,6 +214,13 @@ def find_subarray_index(small_array, large_array):
             return i
     return -1
 
+def check_unique_word(uw_register):
+    uw_register = ''.join(uw_register)
+    if uw_register in phase_ambiguities.keys():
+        return phase_ambiguities[uw_register]
+    else:
+        return None
+
 
 # CLASS DEFINITIONS
 ################################################################################################

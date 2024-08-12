@@ -132,8 +132,13 @@ sample_shift = 0
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
 yk_upsampled = clock_offset(yk_upsampled, fs, timing_offset)[sample_shift:]
 
-# # plot timing offset constellation
-# plot_complex_points((xk_upsampled + 1j*yk_upsampled), constellation=qpsk_constellation)
+# # plot offset symbols
+# plt.figure()
+# plt.stem(yk_upsampled[(len(header)+len(unique_word))*fs:(len(header)+len(unique_word)+5)*fs])
+# plt.title("Upsampled Symbols")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+# plt.show()
 
 
 # PULSE SHAPE
@@ -245,11 +250,11 @@ pll_damping_factor = 1/np.sqrt(2)
 scs_loop_bandwidth = (fc/fs) * 0.03
 scs_damping_factor = 1/np.sqrt(2)
 
+pll = PLL(sample_rate=2, loop_bandwidth=pll_loop_bandwidth, damping_factor=pll_damping_factor, open_loop=True)
+scs = SCS(samples_per_symbol=2, loop_bandwidth=scs_loop_bandwidth, damping_factor=scs_damping_factor, open_loop=True)
 
 # MEASURING PLL AND SCS SYSTEM GAIN
 ##################################################################################################
-pll = PLL(sample_rate=2, loop_bandwidth=pll_loop_bandwidth, damping_factor=pll_damping_factor, open_loop=True)
-scs = SCS(samples_per_symbol=2, loop_bandwidth=scs_loop_bandwidth, damping_factor=scs_damping_factor, open_loop=True)
 
 pll_max_lf_output = 0
 scs_max_lf_output = 0
