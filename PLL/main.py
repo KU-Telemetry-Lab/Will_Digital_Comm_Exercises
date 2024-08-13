@@ -7,6 +7,9 @@ from KUSignalLib import examples as ex
 from KUSignalLib import MatLab as ml
 from KUSignalLib import DSP as dsp
 
+from PLL import PLL
+from PLL2 import PLL2
+
 # SYSTEM PARAMETERS
 ################################################################################################### 
 fs = 500 
@@ -28,12 +31,11 @@ pll_error_record = []
 loop_bandwidth = 0.02 * fs
 damping_factor = 1 / np.sqrt(2)
 pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
+# pll = PLL2(sample_rate=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
 
 # Print loop filter gains for reference
-print(f"Kp: {pll.Kp}")
-print(f"K0: {pll.K0}")
-print(f"K1: {pll.K1}")
-print(f"K2: {pll.K2}")
+print(f"K1: {pll.k1}")
+print(f"K2: {pll.k2}")
 
 # PLL SIMULATION
 ################################################################################################### 

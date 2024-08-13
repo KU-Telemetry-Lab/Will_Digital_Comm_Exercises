@@ -118,8 +118,8 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 # DIGITAL MODULATION
 ##################################################################################################
 # synchronization offsets
-fc_offset = 0.01
-phase_offset = np.pi
+fc_offset = 0.0
+phase_offset = np.pi/3
 
 s_RF = (
     np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc + fc_offset, fs)) +
@@ -188,19 +188,20 @@ uw_offset = 0
 
 # CARRIER PHASE SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = (fc/fs)*0.2
+loop_bandwidth = (fc/fs)*0.02
 damping_factor = 1/np.sqrt(2)
 
-# # measuring pll system gain
-# pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, open_loop=True)
+# measuring pll system gain
+pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, open_loop=True)
 
-# max_lf_output = 0
-# for i in range(len(rk)):
-#     lf_output = pll.insert_new_sample(rk[i], i)
-#     if lf_output > max_lf_output:
-#         max_lf_output = lf_output
+max_lf_output = 0
+for i in range(len(rk)):
+    lf_output = pll.insert_new_sample(rk[i], i)
+    if lf_output > max_lf_output:
+        max_lf_output = lf_output
 
-# print(f"\nPLL Measured System Gain: {max_lf_output}\n")
+pll_gain = max_lf_output
+print(f"\nPLL Measured System Gain: {pll_gain}\n")
 
 # running pll system
 pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=5.42)
