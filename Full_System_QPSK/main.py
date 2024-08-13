@@ -166,8 +166,8 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 # DIGITAL MODULATION
 ##################################################################################################
 # synchronization offsets
-fc_offset = 0.0
-phase_offset = 0
+fc_offset = 0.0005
+phase_offset = 3 * np.pi 
 
 s_rf = (
     np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc + fc_offset, fs)) +
@@ -244,7 +244,7 @@ uw_offset = 0
 
 # SPECIFYING PLL AND SCS SYSTEM 
 ##################################################################################################
-pll_loop_bandwidth = (fc/fs) * 0.2
+pll_loop_bandwidth = (fc/fs) * 0.06
 pll_damping_factor = 1/np.sqrt(2)
 
 scs_loop_bandwidth = (fc/fs) * 0.03
@@ -317,31 +317,31 @@ for i in range(len(r_nT)):
         # feed into loop filter
         loop_filter_output = pll.loop_filter(phase_error)
 
+        # feed into dds
+        pll.dds(i, loop_filter_output)
+
         # generate next dds output
-        dds_output = np.exp(1j * loop_filter_output)
+        dds_output = np.exp(1j * pll.get_current_phase())
 
-# print(f"Phase Ambiguity Rotation: {np.degrees(uw_offset)} deg\n")
-# plt.figure()
-# plt.plot(pll_error_record, label='Phase Error', color='r')
-# plt.title('Phase Error')
-# plt.xlabel('Sample Index')
-# plt.ylabel('Phase Error (radians)')
-# plt.grid()
-# plt.show()
+print(f"Phase Ambiguity Rotation: {np.degrees(uw_offset)} deg\n")
+plt.figure()
+plt.plot(pll_error_record, label='Phase Error', color='r')
+plt.title('Phase Error')
+plt.xlabel('Sample Index')
+plt.ylabel('Phase Error (radians)')
+plt.grid()
+plt.show()
 
-# plt.title("PLL Output Constellations")
-# plt.plot(np.real(rotated_corrected_constellations), np.imag(rotated_corrected_constellations), 'ro', label="Rotated Constellations")
-# plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo',  label="Esteimated Constellations")
-# plt.legend()
-# plt.grid(True)
-# plt.show()
+plt.title("PLL Output Constellations")
+plt.plot(np.real(rotated_corrected_constellations), np.imag(rotated_corrected_constellations), 'ro', label="Rotated Constellations")
+plt.plot(np.real(detected_constellations), np.imag(detected_constellations), 'bo',  label="Esteimated Constellations")
+plt.legend()
+plt.grid(True)
+plt.show()
 
 # MAKE A DECISION FOR EACH PULSE
 ##################################################################################################
-detected_symbols = communications.nearest_neighbor(detected_constellations[len(header)+len(unique_word):], qpsk_constellation)
-
-# adjusting for symbol timing synchronization delay
-detected_symbols = detected_symbols[1:]
+detected_symbols = communications.nearest_neighbor(detected_constellations[len(header)+len(unique_word)+1:], qpsk_constellation)
 
 error_count = error_count(input_message_symbols[len(unique_word):], detected_symbols)
 print(f"Transmission Symbol Errors: {error_count}")

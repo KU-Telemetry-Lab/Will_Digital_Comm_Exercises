@@ -252,7 +252,7 @@ print(f"Phase Ambiguity Rotation: {np.degrees(uw_offset)} deg\n")
 # phase error and constellation plotting
 plt.figure()
 plt.plot(pll_error_record, label='Phase Error', color='r')
-# plt.title('Phase Error')
+plt.title('Phase Error')
 plt.xlabel('Sample Index')
 plt.ylabel('Phase Error (radians)')
 plt.grid()

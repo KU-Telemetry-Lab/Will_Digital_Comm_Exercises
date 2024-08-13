@@ -72,7 +72,7 @@ xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
 # adding header to each channel
-header = [1,0] * 100
+header = [1,0] * 50
 xk = np.concatenate([header, xk])
 yk = np.concatenate([header, yk])
 
@@ -110,7 +110,7 @@ yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 # INTRODUCE TIMING OFFSET
 ###################################################################################################
 timing_offset = 0.0
-sample_shift = 0
+sample_shift = 2
 
 xk_upsampled = clock_offset(xk_upsampled, fs, timing_offset)[sample_shift:]
 yk_upsampled = clock_offset(yk_upsampled, fs, timing_offset)[sample_shift:]
@@ -204,7 +204,7 @@ r_nT = (xr_nT_downsampled + 1j* yr_nT_downsampled)
 
 # SYMBOL TIMING SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = (fc/fs)*0.03
+loop_bandwidth = (fc/fs)*0.0006
 damping_factor = 1/np.sqrt(2)
 
 # measuring scs system gain

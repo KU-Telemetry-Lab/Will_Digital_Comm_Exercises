@@ -40,8 +40,9 @@ class PLL():
         :param df: Float type. Damping factor.
         """
         denominator = 1 + ((2 * df) * ((lb * (1 / fs)) / (df + (1 / (4 * df))))) + ((lb * (1 / fs)) / (df + (1 / (4 * df)))) ** 2
-        self.k1 = ((4 * df) * ((lb * (1 / fs)) / (df + (1 / (4 * df))))) / denominator
-        self.k2 = (((lb * (1 / fs)) / (df + (1 / (4 * df)))) ** 2) / denominator
+        self.k1 = (1/self.gain) * ((4 * df) * ((lb * (1 / fs)) / (df + (1 / (4 * df))))) / denominator
+        self.k2 = (1/self.gain) * (((lb * (1 / fs)) / (df + (1 / (4 * df)))) ** 2) / denominator
+
 
     def insert_new_sample(self, incoming_signal, n, internal_signal=None):
         """
@@ -89,7 +90,7 @@ class PLL():
         lfk2 = self.k2 * phase_error + self.lfk2_prev
         output = self.k1 * phase_error + lfk2
         self.lfk2_prev = lfk2
-        return output * self.gain
+        return output
 
     def dds(self, n, v):
         """

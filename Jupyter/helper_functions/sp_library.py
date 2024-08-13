@@ -383,7 +383,7 @@ class PLL():
         return self.phase
 
 class SCS:
-    def __init__(self, samples_per_symbol, loop_bandwidth, damping_factor, gain=1, open_loop=False):
+    def __init__(self, samples_per_symbol, loop_bandwidth, damping_factor, gain=1, open_loop=False, invert=False):
         '''
         Initialize the SCS (Symbol Clock Synchronization) subsystem class.
 
@@ -395,6 +395,7 @@ class SCS:
         self.samples_per_symbol = samples_per_symbol
         self.gain = gain
         self.open_loop = open_loop
+        self.invert = invert
 
         self.compute_loop_constants(loop_bandwidth, damping_factor, samples_per_symbol)
 
@@ -464,10 +465,16 @@ class SCS:
         self.decrementor_prev = decrementor
 
         if self.open_loop == False:
-            if self.strobe:
-                return interpolated_sample
+            if self.invert == False:
+                if self.strobe:
+                    return interpolated_sample
+                else:
+                    return None
             else:
-                return None
+                if self.strobe:
+                    return None
+                else:
+                    return interpolated_sample
         else:
             return filtered_error
 
