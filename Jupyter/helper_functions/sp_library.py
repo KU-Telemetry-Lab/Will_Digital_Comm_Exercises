@@ -256,12 +256,19 @@ def clock_offset(signal, sample_rate, offset_fraction):
     x_shifted = interpolator(t_shifted)
     return x_shifted
 
-def check_unique_word(uw_register):
+def check_unique_word(uw_register, phase_ambiguities):
+    """
+    Check if the current state of the unique word register matches any entry in the phase ambiguities table.
+
+    :param uw_register: The current state of the unique word shift register as a list of symbols.
+    :return: The corresponding phase ambiguity if a match is found, otherwise None.
+    """
     uw_register = ''.join(uw_register)
     if uw_register in phase_ambiguities.keys():
         return phase_ambiguities[uw_register]
     else:
         return None
+
 
 # CLASS DEFINITIONS
 ################################################################################################
