@@ -72,7 +72,7 @@ xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
 # adding header to each channel
-header = [1,0] * 50
+header = [1,0] * 100
 xk = np.concatenate([header, xk])
 yk = np.concatenate([header, yk])
 
@@ -125,8 +125,8 @@ length = 64
 alpha = 0.10
 pulse_shape = communications.srrc(alpha, fs, length)
 
-xk_pulse_shaped = np.real(np.roll(DSP.convolve(xk_upsampled, pulse_shape, mode="same"), -1))
-yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="same"), -1))
+xk_pulse_shaped = np.real(DSP.convolve(xk_upsampled, pulse_shape, mode="same")[1:])
+yk_pulse_shaped = np.real(DSP.convolve(yk_upsampled, pulse_shape, mode="same")[1:])
 
 # # plot pulse shaped signal
 # plt.figure()
@@ -173,8 +173,8 @@ yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_rf, fc, fs))
 
 # MATCH FILTER
 ##################################################################################################
-xr_nT_match_filtered = np.real(np.roll(DSP.convolve(xr_nT, pulse_shape, mode="same"), -1))
-yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="same"), -1))
+xr_nT_match_filtered = np.real(DSP.convolve(xr_nT, pulse_shape, mode="same")[1:])
+yr_nT_match_filtered = np.real(DSP.convolve(yr_nT, pulse_shape, mode="same")[1:])
 
 # # plot match filtered signal
 # plt.figure()
@@ -227,7 +227,7 @@ for i in range(len(r_nT)):
     if corrected_constellation is not None:
         corrected_constellations.append(corrected_constellation)
 
-# plot_complex_points(corrected_constellations, constellation=qpsk_constellation)
+plot_complex_points(corrected_constellations[len(header):], constellation=qpsk_constellation)
 
 # MAKE A DECISION FOR EACH PULSE
 ##################################################################################################

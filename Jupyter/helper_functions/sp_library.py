@@ -23,7 +23,7 @@ def interpolate(x, n, mode="linear"):
     interpolated_signal = interpolation_function(new_indices)
     return interpolated_signal
 
-def upsample(x, L, offset=0, interpolate_flag=True):
+def upsample(x, L, offset=0, interpolate_flag=False):
     """
     Discrete signal upsample implementation.
 

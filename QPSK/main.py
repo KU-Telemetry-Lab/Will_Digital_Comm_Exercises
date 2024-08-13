@@ -12,8 +12,26 @@ def string_to_ascii_binary(string, num_bits=7):
     return ['{:0{width}b}'.format(ord(char), width=num_bits) for char in string]
 
 def error_count(x, y):
-    return sum(1 for i in range(len(x)) if x[i] != y[i])
+    max_len = max(len(x), len(y))
+    x = x + [0] * (max_len - len(x))
+    y = y + [0] * (max_len - len(y))
+    return sum(1 for i in range(max_len) if x[i] != y[i])
 
+def plot_complex_points(complex_array, constellation):
+    plt.plot([point.real for point in complex_array], [point.imag for point in complex_array], 'ro', label='Received Points')
+    for point, label in constellation:
+        plt.plot(point.real, point.imag, 'b+', markersize=10)
+        plt.text(point.real, point.imag, f' {label}', fontsize=12, verticalalignment='bottom', horizontalalignment='right')
+    
+    plt.xlabel('In-Phase (I)')
+    plt.ylabel('Quadrature (Q)')
+    plt.title('Complex Constellation Plot')
+    plt.axhline(0, color='gray', lw=0.5, ls='--')
+    plt.axvline(0, color='gray', lw=0.5, ls='--')
+    plt.grid()
+    plt.axis('equal')
+    plt.legend()
+    plt.show()
 
 # SYSTEM PARAMETERS
 ###################################################################################################
@@ -43,7 +61,7 @@ xk = np.real([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 yk = np.imag([bits_to_amplitude[symbol] for symbol in input_message_symbols])
 
 # adding header to each channel
-header = np.ones(25)
+header = [1, 0] * 50
 xk = np.concatenate([header, xk])
 yk = np.concatenate([header, yk])
 
@@ -66,13 +84,13 @@ yk = np.concatenate([header, yk])
 xk_upsampled = DSP.upsample(xk, fs, interpolate_flag=False)
 yk_upsampled = DSP.upsample(yk, fs, interpolate_flag=False)
 
-# plot upsampled symbols
-plt.figure()
-plt.stem(yk_upsampled[len(header)*fs:(len(header)+5)*fs])
-plt.title("Upsampled Symbols")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
-plt.show()
+# # plot upsampled symbols
+# plt.figure()
+# plt.stem(yk_upsampled[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Upsampled Symbols")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
+# plt.show()
 
 
 # PULSE SHAPE
@@ -81,20 +99,20 @@ length = 64
 alpha = 0.10
 pulse_shape = communications.srrc(alpha, fs, length)
 
-xk_pulse_shaped = np.real(np.roll(DSP.convolve(xk_upsampled, pulse_shape, mode="same"), -1))
-yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="same"), -1))
+xk_pulse_shaped = np.real(DSP.convolve(xk_upsampled, pulse_shape, mode="same")[1:])
+yk_pulse_shaped = np.real(DSP.convolve(yk_upsampled, pulse_shape, mode="same")[1:])
 
-# plot pulse shaped signal
-plt.figure()
-plt.stem(yk_pulse_shaped[len(header)*fs:(len(header)+5)*fs])
-plt.title("Pulse Shaped Signal")
-plt.xlabel("Sample Time [n]")
-plt.ylabel("Amplutide [V]")
+# # plot pulse shaped signal
+# plt.figure()
+# plt.stem(yk_pulse_shaped[len(header)*fs:(len(header)+5)*fs])
+# plt.title("Pulse Shaped Signal")
+# plt.xlabel("Sample Time [n]")
+# plt.ylabel("Amplutide [V]")
 
-print(f"\nFilter Length: {length} samples")
-print(f"Message Length: {alpha} percent")
-print(f"Sample Rate: {fs} samples per symbol\n")
-plt.show()
+# print(f"\nFilter Length: {length} samples")
+# print(f"Message Length: {alpha} percent")
+# print(f"Sample Rate: {fs} samples per symbol\n")
+# plt.show()
 
 
 # DIGITAL MODULATION
@@ -129,8 +147,8 @@ yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
 
 # MATCH FILTER
 ##################################################################################################
-xr_nT_match_filtered = np.real(np.roll(DSP.convolve(xr_nT, pulse_shape, mode="same"), -1))
-yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="same"), -1))
+xr_nT_match_filtered = np.real(DSP.convolve(xr_nT, pulse_shape, mode="same")[1:])
+yr_nT_match_filtered = np.real(DSP.convolve(yr_nT, pulse_shape, mode="same")[1:])
 
 # # plot match filtered signal
 # plt.figure()
@@ -143,16 +161,16 @@ yr_nT_match_filtered = np.real(np.roll(DSP.convolve(yr_nT, pulse_shape, mode="sa
 
 # DOWNSAMPLE EACH PULSE
 ##################################################################################################
-xk = DSP.downsample(xr_nT_match_filtered, fs)[len(header):] # removing header
-yk= DSP.downsample(yr_nT_match_filtered, fs)[len(header):] # removing header
+xk = DSP.downsample(xr_nT_match_filtered, fs)
+yk= DSP.downsample(yr_nT_match_filtered, fs)
 rk = xk + 1j * yk
 
-communications.plot_complex_points(rk, constellation=qpsk_constellation)
+plot_complex_points(rk, constellation=qpsk_constellation)
 
 
 # MAKE A DECISION FOR EACH PULSE
 ##################################################################################################
-detected_symbols = communications.nearest_neighbor(rk, qpsk_constellation)
+detected_symbols = communications.nearest_neighbor(rk[len(header):], qpsk_constellation)
 error_count = error_count(input_message_symbols, detected_symbols)
 print(f"Transmission Symbol Errors: {error_count}")
 print(f"Bit Error Percentage: {round((error_count * 2) / len(detected_symbols), 2)} %")
