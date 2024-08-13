@@ -30,8 +30,8 @@ pll_error_record = []
 ################################################################################################### 
 loop_bandwidth = 0.02 * fs
 damping_factor = 1 / np.sqrt(2)
-pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
-# pll = PLL2(sample_rate=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
+# pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
+pll = PLL2(sample_rate=fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor)
 
 # Print loop filter gains for reference
 print(f"K1: {pll.k1}")
