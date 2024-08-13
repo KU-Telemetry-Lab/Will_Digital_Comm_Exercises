@@ -24,24 +24,25 @@ class PLL():
         '''
         self.gain = gain
         self.open_loop = open_loop
-        self.compute_loop_constants(sample_rate, loop_bandwidth, damping_factor)
+        self.compute_loop_constants(loop_bandwidth, damping_factor, 1/sample_rate, sample_rate)
 
         self.sample_rate = sample_rate
         self.w0 = 1
         self.phase = 0
         self.sig_out = np.exp(1j * self.phase)
 
-    def compute_loop_constants(self, fs, lb, df):
+    def compute_loop_constants(self, loopBandwidth, dampingFactor, T, sampsPerSym):
         """
-        Compute the loop filter constants based on the given parameters.
-
-        :param fs: Float type. Sampling frequency.
-        :param lb: Float type. Loop bandwidth.
-        :param df: Float type. Damping factor.
+        :param loopBandwidth: Float type. Loop bandwidth.
+        :param dampingFactor: Float type. Damping factor.
+        :param T: Float type. this can be your sampleling peiod(i.e. 1/fs), or in communication systems it
+        can be your symbol time / N (where N is bits sample per symbol) for a higher bandwidth design.
+        Compute the loop filter gains based on the loop bandwidth and damping factor.
         """
-        denominator = 1 + ((2 * df) * ((lb * (1 / fs)) / (df + (1 / (4 * df))))) + ((lb * (1 / fs)) / (df + (1 / (4 * df)))) ** 2
-        self.k1 = ((4 * df) * ((lb * (1 / fs)) / (df + (1 / (4 * df))))) / denominator
-        self.k2 = (((lb * (1 / fs)) / (df + (1 / (4 * df)))) ** 2) / denominator
+        theta_n = (loopBandwidth*T/sampsPerSym)/(dampingFactor + 1/(4*dampingFactor))
+        factor = (4*theta_n)/(1+2*dampingFactor*theta_n+theta_n**2)
+        self.k1 = dampingFactor * factor/self.gain
+        self.k2 = theta_n * factor/self.gain
 
     def insert_new_sample(self, incoming_signal, n, internal_signal=None):
         """
@@ -89,7 +90,7 @@ class PLL():
         lfk2 = self.k2 * phase_error + self.lfk2_prev
         output = self.k1 * phase_error + lfk2
         self.lfk2_prev = lfk2
-        return output * self.gain
+        return output
 
     def dds(self, n, v):
         """

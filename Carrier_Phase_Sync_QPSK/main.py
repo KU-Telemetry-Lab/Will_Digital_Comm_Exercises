@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.insert(0, '../KUSignalLib/src')
-from KUSignalLib import DSP, PLL
+from KUSignalLib import DSP
 from KUSignalLib import communications
 from PLL import PLL
 
@@ -118,10 +118,10 @@ yk_pulse_shaped = np.real(np.roll(DSP.convolve(yk_upsampled, pulse_shape, mode="
 # DIGITAL MODULATION
 ##################################################################################################
 # synchronization offsets
-fc_offset = 0.0
-phase_offset = np.pi/3
+fc_offset = 0.0005
+phase_offset = 3 * np.pi 
 
-s_RF = (
+s_rf = (
     np.sqrt(2) * np.real(DSP.modulate_by_exponential(xk_pulse_shaped, fc + fc_offset, fs)) +
     np.sqrt(2) * np.imag(DSP.modulate_by_exponential(yk_pulse_shaped, fc + fc_offset, fs))
 ) * np.exp(1j * phase_offset)
@@ -137,8 +137,8 @@ s_RF = (
 
 # DIGITAL DEMODULATIOIN
 ##################################################################################################
-xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_RF, fc, fs))
-yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_RF, fc, fs))
+xr_nT = np.sqrt(2) * np.real(DSP.modulate_by_exponential(s_rf, fc, fs))
+yr_nT = np.sqrt(2) * np.imag(DSP.modulate_by_exponential(s_rf, fc, fs))
 
 # # plot demodulated signal
 # plt.figure()
@@ -188,7 +188,7 @@ uw_offset = 0
 
 # CARRIER PHASE SYNCHRONIZATION
 ##################################################################################################
-loop_bandwidth = (fc/fs)*0.02
+loop_bandwidth = (fc/fs)*0.06
 damping_factor = 1/np.sqrt(2)
 
 # measuring pll system gain
@@ -204,11 +204,10 @@ pll_gain = max_lf_output
 print(f"\nPLL Measured System Gain: {pll_gain}\n")
 
 # running pll system
-pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=5.42)
+pll = PLL(fs, loop_bandwidth=loop_bandwidth, damping_factor=damping_factor, gain=pll_gain)
 
 pll_detected_phase_record = []
 pll_error_record = []
-pll_loop_filter_record = []
 
 rotated_constellations = []
 detected_constellations = []
@@ -242,15 +241,18 @@ for i in range(len(rk)):
     # feed into loop filter
     loop_filter_output = pll.loop_filter(phase_error)
 
+    # feed into dds
+    pll.dds(i, loop_filter_output)
+
     # generate next dds output
-    dds_output = np.exp(1j * loop_filter_output)
+    dds_output = np.exp(1j * pll.get_current_phase())
 
 print(f"Phase Ambiguity Rotation: {np.degrees(uw_offset)} deg\n")
 
 # phase error and constellation plotting
 plt.figure()
 plt.plot(pll_error_record, label='Phase Error', color='r')
-plt.title('Phase Error')
+# plt.title('Phase Error')
 plt.xlabel('Sample Index')
 plt.ylabel('Phase Error (radians)')
 plt.grid()
